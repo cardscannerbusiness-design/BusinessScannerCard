@@ -7,6 +7,7 @@ import { syncConnectionModeWithNetwork } from "@/lib/connectionMode";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { NetworkOfflineBanner } from "@/components/layout/NetworkOfflineBanner";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmModalProvider } from "@/components/ui/confirm-modal";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
@@ -105,8 +106,9 @@ export function AppShell() {
           <AppSidebar />
           <SidebarInset className="relative flex min-h-svh flex-1 flex-col bg-transparent">
             <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-surface" />
-            <div className="sticky top-0 z-40 shrink-0 border-b border-border/40 bg-background/95  backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
+            <div className="sticky top-0 z-40 shrink-0 border-b border-border/40 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
               <TopBar />
+              <NetworkOfflineBanner />
             </div>
             <main className="min-h-0 flex-1 w-full max-w-full overflow-x-hidden overflow-y-auto">
               <Outlet />

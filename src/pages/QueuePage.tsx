@@ -4,11 +4,9 @@ import {
   RefreshCw,
   Activity,
   CheckCircle2,
-  AlertTriangle,
   Inbox,
   ArrowRight,
   Loader2,
-  Trash2,
   HardDrive,
   Save,
   CalendarDays,
@@ -22,6 +20,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PAGE } from "@/constants/navigation";
 import { useConfirmModal } from "@/components/ui/confirm-modal";
 import { QueueAnalyticsSection } from "@/components/queue/QueueAnalyticsSection";
+import { QueueItemsTable } from "@/components/queue/QueueItemsTable";
 import {
   getQueueItems,
   updateQueueItem,
@@ -245,6 +244,17 @@ export function QueuePage() {
     [queueItems],
   );
 
+  const queueTableItems = useMemo(
+    () =>
+      [...queueItems]
+        .filter((i) => i.status !== "synced")
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        ),
+    [queueItems],
+  );
+
   const isBusy = isSavingAll;
 
   return (
@@ -284,6 +294,11 @@ export function QueuePage() {
               </Button>
             </div>
           </div>
+        </Card>
+
+        <Card className="rounded-2xl border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground shadow-soft sm:text-sm">
+          <span className="font-medium text-foreground">Storage:</span> This device only
+          (IndexedDB). <span className="text-foreground/80">No remote backend is connected.</span>
         </Card>
 
         {isLoading ? (
@@ -355,135 +370,29 @@ export function QueuePage() {
             </Card>
 
             <Card className="rounded-2xl border-border/60 p-4 shadow-soft sm:p-5">
-              <div className="flex items-center justify-between">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-sm font-medium">Queue — pending</div>
+                  <div className="text-sm font-medium">Queue items</div>
                   <div className="text-xs text-muted-foreground">
-                    Captured while offline or before save — tap Save to store on this device
+                    All captures waiting to save on this device
                   </div>
                 </div>
-                <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
-                  {pendingList.length}
-                </span>
+                <div className="flex flex-wrap gap-2 text-[11px]">
+                  <span className="rounded-full bg-warning/10 px-2 py-0.5 font-medium text-warning">
+                    Pending {pendingList.length}
+                  </span>
+                  <span className="rounded-full bg-destructive/10 px-2 py-0.5 font-medium text-destructive">
+                    Failed {failedList.length}
+                  </span>
+                </div>
               </div>
-              <div className="mt-4 space-y-3">
-                {pendingList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-border/60 bg-card/40 p-3"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{queueItemName(item)}</div>
-                        <div className="truncate text-[11px] text-muted-foreground">
-                          {item.contact_data.company || "No company"} ·{" "}
-                          {item.contact_data.email || item.contact_data.phone || "No contact info"}
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
-                          <span
-                            className={`rounded-full px-2 py-0.5 font-semibold ${
-                              item.status === "retrying"
-                                ? "bg-primary/10 text-primary"
-                                : "bg-warning/10 text-warning"
-                            }`}
-                          >
-                            {item.status}
-                          </span>
-                          <span>Retries: {item.retry_count}/5</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => void handleSaveQueueItem(item)}
-                          disabled={syncingQueueId === item.id || isBusy}
-                          className="h-9 flex-1 rounded-lg text-xs sm:flex-none"
-                        >
-                          {syncingQueueId === item.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <>
-                              <Save className="mr-1.5 h-3 w-3" />
-                              Save
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void handleRemoveQueueItem(item)}
-                          className="h-9 rounded-lg text-xs text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="mr-1 h-3 w-3" />
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {pendingList.length === 0 && (
-                  <p className="py-2 text-xs italic text-muted-foreground">
-                    No pending items — queue is clear.
-                  </p>
-                )}
-              </div>
-            </Card>
-
-            <Card className="rounded-2xl border-destructive/20 bg-destructive/5 p-4 shadow-soft sm:p-5">
-              <div className="flex items-center gap-2 text-sm font-medium text-destructive">
-                <AlertTriangle className="h-4 w-4" />
-                Failed saves
-                <span className="ml-auto rounded-full bg-destructive/10 px-2 py-0.5 text-[11px]">
-                  {failedList.length}
-                </span>
-              </div>
-              <div className="mt-3 space-y-2">
-                {failedList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">{queueItemName(item)}</div>
-                      <div className="mt-0.5 text-[11px] text-destructive">
-                        {item.error_message || "Unknown error"}
-                      </div>
-                      <div className="mt-1 text-[10px] text-muted-foreground">
-                        Retries: {item.retry_count}/5
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleSaveQueueItem(item)}
-                        disabled={syncingQueueId === item.id || isBusy}
-                        className="h-9 rounded-lg text-xs"
-                      >
-                        {syncingQueueId === item.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <>
-                            <RefreshCw className="mr-1.5 h-3 w-3" />
-                            Retry
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void handleRemoveQueueItem(item)}
-                        className="h-9 rounded-lg text-xs"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {failedList.length === 0 && (
-                  <p className="py-2 text-xs italic text-muted-foreground">No failed items.</p>
-                )}
-              </div>
+              <QueueItemsTable
+                items={queueTableItems}
+                syncingQueueId={syncingQueueId}
+                isBusy={isBusy}
+                onSave={(item) => void handleSaveQueueItem(item)}
+                onRemove={(item) => void handleRemoveQueueItem(item)}
+              />
             </Card>
           </div>
         )}

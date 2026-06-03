@@ -1,35 +1,55 @@
-export type ContactStorageMode = "indexeddb";
+export type ContactStorageMode = "postgresql" | "firebase" | "indexeddb";
 
+const VALID: ContactStorageMode[] = ["postgresql", "firebase", "indexeddb"];
+
+/** Set after /api/storage/config (aligns Netlify build with Render CONTACT_STORAGE). */
 let resolvedStorageMode: ContactStorageMode | null = null;
 
 export function setResolvedStorageMode(mode: ContactStorageMode): void {
-  resolvedStorageMode = mode;
+  if (VALID.includes(mode)) {
+    resolvedStorageMode = mode;
+  }
 }
 
 export function getResolvedStorageMode(): ContactStorageMode | null {
   return resolvedStorageMode;
 }
 
+/** Vite build-time default (may differ from Render until resolveStorageMode runs). */
 export function getContactStorageMode(): ContactStorageMode {
+  const raw = String(import.meta.env.VITE_CONTACT_STORAGE || "indexeddb")
+    .trim()
+    .toLowerCase();
+  if (VALID.includes(raw as ContactStorageMode)) {
+    return raw as ContactStorageMode;
+  }
   return "indexeddb";
 }
 
 export function getEffectiveStorageMode(): ContactStorageMode {
-  return resolvedStorageMode ?? "indexeddb";
+  return resolvedStorageMode ?? getContactStorageMode();
 }
 
 export function isIndexedDbStorage(): boolean {
-  return true;
+  return getEffectiveStorageMode() === "indexeddb";
 }
 
 export function isServerStorage(): boolean {
-  return false;
+  return getEffectiveStorageMode() !== "indexeddb";
 }
 
+/** User-facing storage name (online Contacts uses clearer labels for browser storage). */
 export function storageLabel(
-  _mode: ContactStorageMode = getEffectiveStorageMode(),
+  mode: ContactStorageMode = getEffectiveStorageMode(),
   options?: { online?: boolean },
 ): string {
   const online = options?.online ?? false;
-  return online ? "Saved on device" : "This device";
+  switch (mode) {
+    case "indexeddb":
+      return online ? "Saved on device" : "This device";
+    case "firebase":
+      return "Firebase";
+    default:
+      return "PostgreSQL";
+  }
 }

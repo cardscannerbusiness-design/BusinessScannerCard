@@ -6,6 +6,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { getQueueItems } from "@/lib/indexeddb";
 import { seedOfflineSampleContact } from "@/lib/contactStorage";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -26,6 +27,7 @@ export function TopBar() {
   const [connectionMode, setConnectionModeState] = useState<ConnectionMode>("online");
   const [pendingCount, setPendingCount] = useState(0);
   const { fullName: profileName, initials: profileInitials } = useUserSettings();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -107,6 +109,24 @@ export function TopBar() {
     };
   }, [refreshConnectionMode]);
 
+  const headerSearch = (className: string, placeholder?: string) => (
+    <HeaderSearch
+      className={className}
+      placeholder={placeholder}
+      value={isContacts ? contactsQuery : undefined}
+      onChange={(value) => {
+        if (isContacts) {
+          void navigate({
+            to: "/contacts",
+            search: { q: value.trim() || undefined },
+            replace: true,
+          });
+        }
+      }}
+      onSubmit={goToContactsSearch}
+    />
+  );
+
   return (
     <header className="grid h-14 shrink-0 grid-cols-[auto_1fr_auto] items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-4 md:px-6">
       <div className="flex min-w-0 items-center justify-start">
@@ -118,30 +138,14 @@ export function TopBar() {
         />
       </div>
 
-      <div
-        className={cn(
-          "flex min-w-0 flex-1 px-1 sm:px-2",
-          !isContacts && "max-md:hidden",
-          "justify-center md:justify-start",
+      <div className="flex min-w-0 flex-1 px-1 sm:px-2 md:justify-start">
+        {headerSearch(
+          cn(
+            "w-full max-w-full",
+            isContacts ? "md:max-w-md" : "md:max-w-sm lg:max-w-md",
+          ),
+          isMobile ? "Search contacts…" : undefined,
         )}
-      >
-        <HeaderSearch
-          className={cn(
-            "w-full max-w-md",
-            isContacts ? "max-md:max-w-none" : "md:max-w-sm lg:max-w-md",
-          )}
-          value={isContacts ? contactsQuery : undefined}
-          onChange={(value) => {
-            if (isContacts) {
-              void navigate({
-                to: "/contacts",
-                search: { q: value.trim() || undefined },
-                replace: true,
-              });
-            }
-          }}
-          onSubmit={goToContactsSearch}
-        />
       </div>
 
       <div className="flex items-center justify-end gap-2">

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "dev:all": "concurrently -k -n api,web -c green,magenta \"npm run server\" \"npm run dev\"",
+    "server": "python ../backend/run.py",
     "build": "vite build",
     "build:local": "vite build --mode development",
     "build:dev": "vite build --mode development",
@@ -13,7 +15,7 @@
     "serve:netlify": "node scripts/serve-netlify.mjs",
     "build:serve": "npm run build && npm run serve:netlify",
     "build:serve:dist": "npm run build && npm run serve:dist",
-    "wipe:all": "node scripts/wipe-all-data.mjs",
+    "wipe:all": "python ../backend/scripts/wipe_all_data.py",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
@@ -83,6 +85,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",

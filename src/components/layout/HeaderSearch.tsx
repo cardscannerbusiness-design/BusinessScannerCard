@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 type HeaderSearchProps = {
   className?: string;
+  placeholder?: string;
   value?: string;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
@@ -11,6 +12,7 @@ type HeaderSearchProps = {
 
 export function HeaderSearch({
   className,
+  placeholder = "Search directory, companies, or queue…",
   value,
   onChange,
   onSubmit,
@@ -33,7 +35,7 @@ export function HeaderSearch({
         id="header-search"
         name="header-search"
         type="search"
-        placeholder="Search directory, companies, or queue…"
+        placeholder={placeholder}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         className="h-9 w-full rounded-md border-border/60 bg-white pl-9 text-sm text-foreground shadow-none focus-visible:bg-white focus-visible:ring-1 focus-visible:ring-border/80 dark:bg-white dark:focus-visible:bg-white"
