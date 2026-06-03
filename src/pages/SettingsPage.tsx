@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { Mail, MessageCircle, Moon, Bell, Shield, User, Loader2, Trash2 } from "lucide-react";
+import { Mail, MessageCircle, Moon, Bell, User, Loader2, Trash2 } from "lucide-react";
 import { clearLocalQueueOnly, wipeAllAppData } from "@/lib/wipeAllData";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { PageShell } from "@/components/layout/PageShell";
+import { PAGE } from "@/constants/navigation";
 import { toast } from "sonner";
+import { useConfirmModal } from "@/components/ui/confirm-modal";
 import {
   DEFAULT_USER_SETTINGS,
   getUserInitials,
@@ -16,14 +18,11 @@ import {
   type UserSettings,
 } from "@/lib/settingsStorage";
 export function SettingsPage() {
+  const { confirm } = useConfirmModal();
   const [profile, setProfile] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [dark, setDark] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [isWhatsappConnected, setIsWhatsappConnected] = useState(false);
-  const [isTestingWhatsapp, setIsTestingWhatsapp] = useState(false);
-  const [isMailConnected, setIsMailConnected] = useState(false);
-  const [isTestingMail, setIsTestingMail] = useState(false);
   const [isWiping, setIsWiping] = useState(false);
   const [isClearingQueue, setIsClearingQueue] = useState(false);
 
@@ -36,8 +35,6 @@ export function SettingsPage() {
     setDark(stored);
     document.documentElement.classList.toggle("dark", stored);
 
-    setIsWhatsappConnected(localStorage.getItem("wa-connected") === "1");
-    setIsMailConnected(localStorage.getItem("mail-connected") === "1");
   }, []);
 
   const updateProfileField = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
@@ -63,9 +60,14 @@ export function SettingsPage() {
   };
 
   const handleClearQueue = async () => {
-    if (!window.confirm("Clear the offline sync queue on this device? Contacts already saved elsewhere are not removed.")) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Clear offline queue?",
+      description:
+        "Clear the offline sync queue on this device? Contacts already saved elsewhere are not removed.",
+      confirmLabel: "Clear queue",
+      destructive: true,
+    });
+    if (!ok) return;
     setIsClearingQueue(true);
     try {
       await clearLocalQueueOnly();
@@ -78,9 +80,13 @@ export function SettingsPage() {
   };
 
   const handleWipeAll = async () => {
-    const ok = window.confirm(
-      "Delete ALL contacts and queue data on this device?\n\nThis cannot be undone.",
-    );
+    const ok = await confirm({
+      title: "Delete all data?",
+      description:
+        "Delete ALL contacts and queue data on this device?\n\nThis cannot be undone.",
+      confirmLabel: "Delete all",
+      destructive: true,
+    });
     if (!ok) return;
     setIsWiping(true);
     try {
@@ -91,43 +97,6 @@ export function SettingsPage() {
     } finally {
       setIsWiping(false);
     }
-  };
-
-  const toggleWhatsapp = () => {
-    const newState = !isWhatsappConnected;
-    setIsWhatsappConnected(newState);
-    localStorage.setItem("wa-connected", newState ? "1" : "0");
-    toast[newState ? "success" : "info"](
-      newState ? "WhatsApp Business connected." : "WhatsApp Business disconnected.",
-    );
-  };
-
-  const testWhatsapp = async () => {
-    if (!isWhatsappConnected) return;
-    setIsTestingWhatsapp(true);
-    toast.info("WhatsApp sending is not configured in this frontend-only build.");
-    setIsTestingWhatsapp(false);
-  };
-
-  const toggleMail = () => {
-    const newState = !isMailConnected;
-    setIsMailConnected(newState);
-    localStorage.setItem("mail-connected", newState ? "1" : "0");
-    toast[newState ? "success" : "info"](
-      newState ? "Email connected." : "Email disconnected.",
-    );
-  };
-
-  const testMail = async () => {
-    if (!isMailConnected) return;
-    const to = (profile.integrationEmail || profile.email || "").trim();
-    if (!to) {
-      toast.error("Set an integration or profile email in Settings first.");
-      return;
-    }
-    setIsTestingMail(true);
-    toast.info("Email sending is not configured in this frontend-only build.");
-    setIsTestingMail(false);
   };
 
   const toggleNotifications = (enabled: boolean) => {
@@ -149,7 +118,7 @@ export function SettingsPage() {
   };
 
   return (
-    <PageShell title="Settings" description="Personalise your workspace and connect your follow-up channels.">
+    <PageShell title={PAGE.preferences.title} description={PAGE.preferences.description}>
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Profile */}
         <Card className="rounded-2xl border-border/60 p-6 shadow-soft lg:col-span-2">
@@ -263,85 +232,6 @@ export function SettingsPage() {
                 onCheckedChange={toggleWhatsappNotifications}
               />
             </div>
-          </div>
-        </Card>
-
-        {/* Integrations */}
-        <Card className="rounded-2xl border-border/60 p-6 shadow-soft h-full flex flex-col lg:col-span-2">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Shield className="h-4 w-4 text-primary" /> Integrations
-          </div>
-          <div className="mt-5 space-y-3">
-            <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${isWhatsappConnected ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
-                    <MessageCircle className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">WhatsApp Business</div>
-                    <Input
-                      value={profile.whatsappPhone}
-                      onChange={(e) => updateProfileField("whatsappPhone", e.target.value)}
-                      className="mt-1 h-8 w-full max-w-[220px] rounded-lg text-[11px]"
-                      placeholder="+1 415 555 0142"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isWhatsappConnected && (
-                    <Button variant="outline" size="sm" onClick={testWhatsapp} disabled={isTestingWhatsapp} className="h-7 text-xs">
-                      {isTestingWhatsapp ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
-                      Test
-                    </Button>
-                  )}
-                  <Button variant={isWhatsappConnected ? "outline" : "default"} size="sm" onClick={toggleWhatsapp} className={`h-7 text-xs ${!isWhatsappConnected && "bg-gradient-primary shadow-glow"}`}>
-                    {isWhatsappConnected ? "Disconnect" : "Connect"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${isMailConnected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                    <Mail className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Email · Postmark</div>
-                    <Input
-                      value={profile.integrationEmail}
-                      onChange={(e) => updateProfileField("integrationEmail", e.target.value)}
-                      className="mt-1 h-8 w-full max-w-[220px] rounded-lg text-[11px]"
-                      placeholder="hello@cardsync.ai"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isMailConnected && (
-                    <Button variant="outline" size="sm" onClick={testMail} disabled={isTestingMail} className="h-7 text-xs">
-                      {isTestingMail ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
-                      Test
-                    </Button>
-                  )}
-                  <Button variant={isMailConnected ? "outline" : "default"} size="sm" onClick={toggleMail} className={`h-7 text-xs ${!isMailConnected && "bg-gradient-primary shadow-glow"}`}>
-                    {isMailConnected ? "Disconnect" : "Connect"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                saveUserSettings(profile);
-                toast.success("Integration details saved.");
-              }}
-              className="rounded-xl"
-            >
-              Save integration details
-            </Button>
           </div>
         </Card>
 

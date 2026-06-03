@@ -33,11 +33,11 @@ export function HeaderSearch({
         id="header-search"
         name="header-search"
         type="search"
-        placeholder="Search contacts, companies, queue…"
+        placeholder="Search directory, companies, or queue…"
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         className="h-9 w-full rounded-md border-border/60 bg-white pl-9 text-sm text-foreground shadow-none focus-visible:bg-white focus-visible:ring-1 focus-visible:ring-border/80 dark:bg-white dark:focus-visible:bg-white"
-        aria-label="Search contacts, companies, and queue"
+        aria-label="Search contact directory, companies, and sync queue"
       />
     </form>
   );

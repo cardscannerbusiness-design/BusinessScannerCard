@@ -4,13 +4,13 @@ import { SettingsPage } from "@/pages/SettingsPage";
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "Settings · CardSync AI" },
+      { title: "Preferences · CardSync AI" },
       {
         name: "description",
-        content: "Profile, integrations, notification and appearance preferences.",
+        content: "Profile, notifications, and appearance for your workspace.",
       },
-      { property: "og:title", content: "Settings · CardSync AI" },
-      { property: "og:description", content: "Manage your CardSync workspace preferences." },
+      { property: "og:title", content: "Preferences · CardSync AI" },
+      { property: "og:description", content: "Configure your CardSync AI workspace." },
     ],
   }),
   component: SettingsPage,

@@ -4,9 +4,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/layout/PageShell";
+import { PAGE } from "@/constants/navigation";
 import { StatusPill } from "@/components/layout/StatusPill";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useConfirmModal } from "@/components/ui/confirm-modal";
 import {
   deleteContact,
   listContacts,
@@ -49,6 +51,7 @@ const tabs: { key: "all" | ContactStatus; label: string }[] = [
 ];
 
 export function ContactsPage() {
+  const { confirm } = useConfirmModal();
   const [contactsList, setContactsList] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +60,6 @@ export function ContactsPage() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [isSyncingZoho, setIsSyncingZoho] = useState(false);
-  const [localDbOnline, setLocalDbOnline] = useState<boolean | null>(null);
   const [browserStorage] = useState(true);
 
   const isAppOnline = () =>
@@ -80,7 +82,6 @@ export function ContactsPage() {
 
       let localDbData: any[] = [];
       const useBrowserStorage = true;
-      setLocalDbOnline(true);
       const onlineView = isAppOnline();
       try {
         localDbData = await listContacts();
@@ -273,9 +274,13 @@ export function ContactsPage() {
   };
 
   const handleDelete = async (contact: Contact) => {
-    if (!confirm("Are you sure you want to delete this contact?")) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Delete contact?",
+      description: "Are you sure you want to delete this contact? This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
 
     if (contact.source === "queue") {
       try {
@@ -390,8 +395,12 @@ export function ContactsPage() {
   return (
     <div className="page-bottom-safe lg:pb-0">
     <PageShell
-      title="Contacts"
-      description={`${contactsList.length} contacts`}
+      title={PAGE.contacts.title}
+      description={
+        contactsList.length > 0
+          ? `${PAGE.contacts.description} · ${contactsList.length} record${contactsList.length === 1 ? "" : "s"}`
+          : PAGE.contacts.description
+      }
       actions={
         <>
           {pendingZohoCount > 0 && (
@@ -418,14 +427,6 @@ export function ContactsPage() {
         </>
       }
     >
-      {localDbOnline === false && !isIndexedDbStorage() && (
-        <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          {storageLabel()} or the Python API is unavailable. Run{" "}
-          <code className="rounded bg-black/30 px-1.5 py-0.5">npm run dev:all</code>
-          , ensure your storage backend is configured in{" "}
-          <code className="rounded bg-black/30 px-1.5 py-0.5">.env</code>, then refresh.
-        </div>
-      )}
       <Card className="rounded-2xl border-border/60 p-3 shadow-soft sm:p-5">
         <div className="flex flex-col gap-3">
           <div className="relative w-full">
@@ -709,7 +710,7 @@ export function ContactsPage() {
           <button
             onClick={handleSyncAllPendingToZoho}
             disabled={isSyncingZoho || isLoading}
-            title="Sync local contacts to Zoho CRM (requires internet)"
+            title="Save pending contacts on this device"
             className="flex h-12 min-w-12 items-center justify-center gap-2 rounded-2xl border border-border/60 bg-card px-3 text-foreground shadow-soft transition active:scale-95 disabled:opacity-50 sm:h-14 sm:px-4"
           >
             {isSyncingZoho ? (
@@ -722,15 +723,11 @@ export function ContactsPage() {
             )}
           </button>
         )}
-        {(shouldUseOfflineQueue() || browserStorage) && pendingQueueCount > 0 ? (
+        {pendingQueueCount > 0 ? (
           <button
             onClick={handleSyncAllQueue}
             disabled={isSyncingAll || isLoading}
-            title={
-              browserStorage
-                ? "Sync queued contacts to Zoho CRM"
-                : `Sync queued contacts to ${storageLabel()}`
-            }
+            title="Save queued contacts on this device"
             className="flex h-12 min-w-12 items-center justify-center gap-2 rounded-2xl bg-gradient-primary px-3 text-primary-foreground shadow-glow transition active:scale-95 disabled:opacity-50 sm:h-14 sm:px-4"
           >
             {isSyncingAll ? (
@@ -738,9 +735,7 @@ export function ContactsPage() {
             ) : (
               <>
                 <Send className="h-5 w-5" />
-                <span className="text-sm font-medium">
-                  {browserStorage ? "Sync queue to Zoho" : "Sync to Local DB"}
-                </span>
+                <span className="text-sm font-medium">Save queue</span>
               </>
             )}
           </button>

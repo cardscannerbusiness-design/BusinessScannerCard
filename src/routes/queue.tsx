@@ -4,10 +4,10 @@ import { QueuePage } from "@/pages/QueuePage";
 export const Route = createFileRoute("/queue")({
   head: () => ({
     meta: [
-      { title: "Queue Center · CardSync AI" },
+      { title: "Sync queue · CardSync AI" },
       {
         name: "description",
-        content: "Browser queue → local PostgreSQL → Zoho CRM sync pipeline.",
+        content: "Review and save contacts captured offline or awaiting sync on this device.",
       },
     ],
   }),

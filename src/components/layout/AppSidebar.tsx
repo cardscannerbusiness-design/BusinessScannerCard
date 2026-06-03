@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
 import { sidebarItems } from "@/constants/sidebarItems";
+import { NAV_SECTION_LABEL, PRODUCT_TAGLINE } from "@/constants/navigation";
 
 import {
   Sidebar,
@@ -41,7 +42,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="leading-tight">
               <div className="font-display text-[15px] font-semibold tracking-tight">CardSync AI</div>
-              <div className="text-[11px] text-muted-foreground">Lead capture · v2.4</div>
+              <div className="text-[11px] text-muted-foreground">{PRODUCT_TAGLINE}</div>
             </div>
           )}
         </Link>
@@ -50,7 +51,7 @@ export function AppSidebar() {
       <SidebarContent className="px-2">
         <SidebarGroup>
           <SidebarGroupLabel className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
-            Workspace
+            {NAV_SECTION_LABEL}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -65,7 +66,9 @@ export function AppSidebar() {
                     >
                       <Link to={item.url} className="flex items-center gap-3">
                         <item.icon className="h-4 w-4" />
-                        {!collapsed && <span className="text-md">{item.title}</span>}
+                        {!collapsed && (
+                          <span className="text-sm font-medium tracking-tight">{item.title}</span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

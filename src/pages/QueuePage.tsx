@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+﻿import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   RefreshCw,
@@ -27,6 +27,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PageShell } from "@/components/layout/PageShell";
+import { PAGE } from "@/constants/navigation";
+import { useConfirmModal } from "@/components/ui/confirm-modal";
 import {
   getQueueItems,
   updateQueueItem,
@@ -61,6 +63,7 @@ function queueItemName(item: QueueItem): string {
 }
 
 export function QueuePage() {
+  const { confirm } = useConfirmModal();
   const [localDbContacts, setLocalDbContacts] = useState<StoredContact[]>([]);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -307,7 +310,13 @@ export function QueuePage() {
   };
 
   const handleRemoveQueueItem = async (item: QueueItem) => {
-    if (!confirm(`Remove "${queueItemName(item)}" from the browser queue?`)) return;
+    const ok = await confirm({
+      title: "Remove from queue?",
+      description: `Remove "${queueItemName(item)}" from the browser queue?`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await removeQueueItem(item.id);
       toast.success("Removed from queue.");
@@ -410,13 +419,7 @@ export function QueuePage() {
 
   return (
     <div className="page-bottom-safe lg:pb-0">
-      <PageShell
-        title="Queue Center"
-        description={
-          indexedDbMode
-            ? "Offline saves → browser queue → Zoho CRM when online"
-            : "Browser queue → local PostgreSQL → Zoho CRM"
-        }
+      <PageShell title={PAGE.syncQueue.title} description={PAGE.syncQueue.description}
         actions={
           <>
             <Button

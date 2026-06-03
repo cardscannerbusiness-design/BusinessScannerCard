@@ -4,15 +4,15 @@ import { ContactsPage } from "@/pages/ContactsPage";
 export const Route = createFileRoute("/contacts")({
   head: () => ({
     meta: [
-      { title: "Contacts · CardSync AI" },
+      { title: "Contact directory · CardSync AI" },
       {
         name: "description",
-        content: "Search, filter and manage every contact captured across events and devices.",
+        content: "Search, filter, and manage every lead saved on this device.",
       },
-      { property: "og:title", content: "Contacts · CardSync AI" },
+      { property: "og:title", content: "Contact directory · CardSync AI" },
       {
         property: "og:description",
-        content: "Your full lead database, filtered by sync state and channel.",
+        content: "Your complete lead library, organised by status and channel.",
       },
     ],
   }),

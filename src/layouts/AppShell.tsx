@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { Toaster } from "@/components/ui/sonner";
+import { ConfirmModalProvider } from "@/components/ui/confirm-modal";
 import { getQueueItems } from "@/lib/indexeddb";
 import { syncAllQueueItemsToZoho } from "@/lib/contactStorage";
 export function AppShell() {
@@ -19,9 +20,7 @@ export function AppShell() {
 
     const routesToPreload = ["/scan", "/contacts", "/queue", "/settings"];
     routesToPreload.forEach((path) => {
-      router.preloadRoute({ to: path }).catch((err) => {
-        console.warn(`[Preload] Failed to preload route ${path}:`, err);
-      });
+      router.preloadRoute({ to: path }).catch(() => undefined);
     });
 
     if ("serviceWorker" in navigator) {
@@ -31,13 +30,9 @@ export function AppShell() {
           .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
           .then(() => caches.keys())
           .then((names) => Promise.all(names.map((name) => caches.delete(name))))
-          .then(() => console.log("[SW] Dev mode: unregistered service workers and cleared caches"))
-          .catch((err) => console.warn("[SW] Dev cleanup warning:", err));
+          .catch(() => undefined);
       } else {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((reg) => console.log("[SW] Registered successfully with scope:", reg.scope))
-          .catch((err) => console.error("[SW] Registration failed:", err));
+        navigator.serviceWorker.register("/sw.js").catch(() => undefined);
       }
     }
 
@@ -58,8 +53,8 @@ export function AppShell() {
         }
         window.dispatchEvent(new CustomEvent("cs-contacts-updated"));
         window.dispatchEvent(new CustomEvent("cs-queue-updated"));
-      } catch (queueErr) {
-        console.error("Failed to read/process IndexedDB queue:", queueErr);
+      } catch {
+        /* queue sync is best-effort */
       }
     };
 
@@ -96,6 +91,7 @@ export function AppShell() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ConfirmModalProvider>
       <SidebarProvider>
         <div className="flex min-h-screen w-full bg-background">
           <AppSidebar />
@@ -111,6 +107,7 @@ export function AppShell() {
         </div>
         <Toaster position="top-right" />
       </SidebarProvider>
+      </ConfirmModalProvider>
     </QueryClientProvider>
   );
 }

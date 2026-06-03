@@ -24,16 +24,12 @@ function dispatchQueueUpdate() {
 }
 
 export async function initDB(): Promise<IDBPDatabase> {
-  console.log(`[IndexedDB] Initializing database: ${DB_NAME}, version: ${DB_VERSION}`);
   return openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion, newVersion) {
-      console.log(`[IndexedDB] Upgrading database ${DB_NAME} from version ${oldVersion} to ${newVersion}`);
+    upgrade(db) {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        console.log(`[IndexedDB] Creating object store: ${STORE_NAME}`);
         db.createObjectStore(STORE_NAME, { keyPath: "id" });
       }
       if (!db.objectStoreNames.contains(CONTACTS_CACHE_STORE)) {
-        console.log(`[IndexedDB] Creating object store: ${CONTACTS_CACHE_STORE}`);
         db.createObjectStore(CONTACTS_CACHE_STORE, { keyPath: "id" });
       }
     },
@@ -41,59 +37,29 @@ export async function initDB(): Promise<IDBPDatabase> {
 }
 
 export async function addToQueue(item: QueueItem): Promise<void> {
-  console.log("ADDING TO QUEUE", item);
-  try {
-    const db = await initDB();
-    await db.put(STORE_NAME, item);
-    console.log("SUCCESSFULLY ADDED", item.id);
-    dispatchQueueUpdate();
-  } catch (err) {
-    console.error("INDEXEDDB ERROR", err);
-    throw err;
-  }
+  const db = await initDB();
+  await db.put(STORE_NAME, item);
+  dispatchQueueUpdate();
 }
 
 export async function getQueueItems(): Promise<QueueItem[]> {
-  console.log("[IndexedDB] Fetching queue items");
-  try {
-    const db = await initDB();
-    const items = await db.getAll(STORE_NAME);
-    console.log(`[IndexedDB] Fetched ${items.length} item(s)`);
-    return items;
-  } catch (err) {
-    console.error("[IndexedDB] Error fetching queue items:", err);
-    throw err;
-  }
+  const db = await initDB();
+  return db.getAll(STORE_NAME);
 }
 
 export async function updateQueueItem(item: QueueItem): Promise<void> {
-  console.log("[IndexedDB] Updating queue item:", item.id, item.status);
-  try {
-    const db = await initDB();
-    await db.put(STORE_NAME, item);
-    console.log("[IndexedDB] Updated item successfully:", item.id);
-    dispatchQueueUpdate();
-  } catch (err) {
-    console.error("[IndexedDB] Error updating queue item:", err);
-    throw err;
-  }
+  const db = await initDB();
+  await db.put(STORE_NAME, item);
+  dispatchQueueUpdate();
 }
 
 export async function removeQueueItem(id: string): Promise<void> {
-  console.log("[IndexedDB] Removing queue item:", id);
-  try {
-    const db = await initDB();
-    await db.delete(STORE_NAME, id);
-    console.log("[IndexedDB] Removed item successfully:", id);
-    dispatchQueueUpdate();
-  } catch (err) {
-    console.error("[IndexedDB] Error removing queue item:", err);
-    throw err;
-  }
+  const db = await initDB();
+  await db.delete(STORE_NAME, id);
+  dispatchQueueUpdate();
 }
 
 export async function cacheContacts(contacts: any[]): Promise<void> {
-  console.log("[IndexedDB] Caching", contacts.length, "contacts");
   try {
     const db = await initDB();
     const tx = db.transaction(CONTACTS_CACHE_STORE, "readwrite");
@@ -103,21 +69,16 @@ export async function cacheContacts(contacts: any[]): Promise<void> {
       await store.put(contact);
     }
     await tx.done;
-    console.log("[IndexedDB] Contacts cached successfully");
-  } catch (err) {
-    console.error("[IndexedDB] Error caching contacts:", err);
+  } catch {
+    /* cache is best-effort */
   }
 }
 
 export async function getCachedContacts(): Promise<any[]> {
-  console.log("[IndexedDB] Fetching cached contacts");
   try {
     const db = await initDB();
-    const contacts = await db.getAll(CONTACTS_CACHE_STORE);
-    console.log(`[IndexedDB] Fetched ${contacts.length} cached contact(s)`);
-    return contacts;
-  } catch (err) {
-    console.error("[IndexedDB] Error fetching cached contacts:", err);
+    return db.getAll(CONTACTS_CACHE_STORE);
+  } catch {
     return [];
   }
 }
@@ -142,10 +103,9 @@ export async function removeCachedContact(id: string): Promise<void> {
   try {
     const db = await initDB();
     await db.delete(CONTACTS_CACHE_STORE, id);
-    console.log("[IndexedDB] Removed cached contact:", id);
     window.dispatchEvent(new CustomEvent("cs-contacts-updated"));
-  } catch (err) {
-    console.error("[IndexedDB] Error removing cached contact:", err);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -160,7 +120,11 @@ function contactRecordFromPayload(
   const syncStatus = String(payload.syncStatus || "local_only");
   const zohoLeadId = payload.zohoLeadId as string | null | undefined;
   const status =
-    syncStatus === "synced_zoho" || zohoLeadId ? "synced" : syncStatus === "failed" ? "failed" : "pending";
+    syncStatus === "synced_zoho" || syncStatus === "synced" || zohoLeadId
+      ? "synced"
+      : syncStatus === "failed"
+        ? "failed"
+        : "pending";
 
   return {
     id,
@@ -187,10 +151,7 @@ function contactRecordFromPayload(
     source: "indexeddb",
     status,
     created_at: String(payload.created_at || now),
-    lastSync:
-      status === "synced"
-        ? "Synced to Zoho"
-        : "IndexedDB · pending Zoho",
+    lastSync: status === "synced" ? "Saved on device" : "Pending",
     channels: {
       whatsapp: Boolean(payload.phone),
       email: Boolean(payload.email),
@@ -260,4 +221,3 @@ export async function patchStoredContactSyncStatus(
     zohoLeadId: zohoLeadId ?? existing.zohoLeadId,
   });
 }
-

@@ -4,6 +4,7 @@ import { Camera, Upload, ScanLine, Sparkles, FileImage, X, Loader2, CheckCircle2
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/PageShell";
+import { PAGE } from "@/constants/navigation";
 import { listContacts } from "@/lib/contactStorage";
 import { CONNECTION_MODE_CHANGED, getConnectionMode } from "@/lib/connectionMode";
 import { useUserSettings } from "@/hooks/useUserSettings";
@@ -271,10 +272,7 @@ export function ScanPage() {
   };
 
   return (
-    <PageShell
-      title="Scan card"
-      description="Drop an image, snap a photo, or queue a batch. AI extracts contact details automatically."
-    >
+    <PageShell title={PAGE.capture.title} description={PAGE.capture.description}>
       {/* Interactive greeting banner */}
       <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/40 p-5 backdrop-blur-xl shadow-soft">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
