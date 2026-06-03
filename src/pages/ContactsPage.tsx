@@ -405,29 +405,40 @@ export function ContactsPage() {
           : PAGE.contacts.description
       }
       actions={
-        <>
+        <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void fetchContactsList()}
+            disabled={isLoading}
+            className="h-10 shrink-0 rounded-xl"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 shrink-0 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           {pendingZohoCount > 0 && (
             <Button
               variant="outline"
-              onClick={handleSyncAllPendingToZoho}
+              onClick={() => void handleSyncAllPendingToZoho()}
               disabled={isSyncingZoho || isLoading}
-              className="rounded-xl"
+              className="h-10 shrink-0 rounded-xl"
             >
               {isSyncingZoho ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
               ) : (
-                <Send className="mr-2 h-4 w-4" />
+                <Send className="mr-2 h-4 w-4 shrink-0" />
               )}
               Save on device
             </Button>
           )}
-          <Button variant="outline" className="rounded-xl">
-            <Filter className="mr-2 h-4 w-4" /> Filters
+          <Button variant="outline" className="h-10 shrink-0 rounded-xl">
+            <Filter className="mr-2 h-4 w-4 shrink-0" />
+            Filters
           </Button>
-          <Button className="rounded-xl bg-gradient-primary shadow-glow">
-            <Plus className="mr-2 h-4 w-4" /> New contact
+          <Button className="h-10 shrink-0 rounded-xl bg-gradient-primary shadow-glow">
+            <Plus className="mr-2 h-4 w-4 shrink-0" />
+            New contact
           </Button>
-        </>
+        </div>
       }
     >
       <Card className="rounded-2xl border-border/60 p-3 shadow-soft sm:p-5">
@@ -438,7 +449,7 @@ export function ContactsPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search name, company or email"
-              className="h-10 w-full rounded-xl border-border/60 bg-background pl-9"
+              className="h-10 w-full rounded-md border-border/60 bg-background pl-9"
             />
           </div>
 
@@ -707,51 +718,41 @@ export function ContactsPage() {
         )}
       </Card>
 
-      {/* Floating sync buttons — mobile-friendly with safe area */}
-      <div className="fab-bottom fixed right-3 z-40 flex flex-col items-end gap-2 sm:right-6">
-        {pendingZohoCount > 0 && (
-          <button
-            onClick={handleSyncAllPendingToZoho}
-            disabled={isSyncingZoho || isLoading}
-            title="Save pending contacts on this device"
-            className="flex h-12 min-w-12 items-center justify-center gap-2 rounded-2xl border border-border/60 bg-card px-3 text-foreground shadow-soft transition active:scale-95 disabled:opacity-50 sm:h-14 sm:px-4"
-          >
-            {isSyncingZoho ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                <Send className="h-5 w-5" />
-                <span className="text-sm font-medium">Save on device</span>
-              </>
-            )}
-          </button>
-        )}
-        {pendingQueueCount > 0 ? (
-          <button
-            onClick={handleSyncAllQueue}
-            disabled={isSyncingAll || isLoading}
-            title="Save queued contacts on this device"
-            className="flex h-12 min-w-12 items-center justify-center gap-2 rounded-2xl bg-gradient-primary px-3 text-primary-foreground shadow-glow transition active:scale-95 disabled:opacity-50 sm:h-14 sm:px-4"
-          >
-            {isSyncingAll ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                <Send className="h-5 w-5" />
-                <span className="text-sm font-medium">Save queue</span>
-              </>
-            )}
-          </button>
-        ) : pendingZohoCount === 0 ? (
-          <button
-            onClick={() => fetchContactsList()}
-            disabled={isLoading}
-            className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow transition hover:scale-105 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-        ) : null}
-      </div>
+      {(pendingZohoCount > 0 || pendingQueueCount > 0) && (
+        <div className="fab-bottom fab-above-cookie fixed z-40 flex flex-col items-end gap-2">
+          {pendingZohoCount > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => void handleSyncAllPendingToZoho()}
+              disabled={isSyncingZoho || isLoading}
+              title="Save pending contacts on this device"
+              className="h-11 shrink-0 rounded-2xl border-border/60 bg-card px-3 shadow-soft sm:h-12"
+            >
+              {isSyncingZoho ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              <span className="text-sm font-medium">Save on device</span>
+            </Button>
+          )}
+          {pendingQueueCount > 0 && (
+            <Button
+              onClick={() => void handleSyncAllQueue()}
+              disabled={isSyncingAll || isLoading}
+              title="Save queued contacts on this device"
+              className="h-11 shrink-0 rounded-2xl bg-gradient-primary px-3 shadow-glow sm:h-12"
+            >
+              {isSyncingAll ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              <span className="text-sm font-medium">Save queue</span>
+            </Button>
+          )}
+        </div>
+      )}
     </PageShell>
     </div>
   );

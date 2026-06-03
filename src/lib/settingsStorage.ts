@@ -27,7 +27,7 @@ const STORAGE_KEY = "cs-user-settings";
 
 export const TIMEZONE_OPTIONS = [
   "Pacific Time (US)",
-  "Mountain Time (US)",
+  "Mountain Time (US)", 
   "Central Time (US)",
   "Eastern Time (US)",
   "GMT / UTC",

@@ -17,6 +17,7 @@ export default defineConfig({
   ssr: {
     // victory-vendor (recharts → d3-shape) is CJS; must bundle for Netlify SSR ESM loader
     noExternal: [
+      "echarts",
       "recharts",
       "victory-vendor",
       "@reduxjs/toolkit",

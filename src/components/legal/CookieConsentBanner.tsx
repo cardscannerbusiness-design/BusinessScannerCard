@@ -29,7 +29,7 @@ export function CookieConsentBanner() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+    <div className="cookie-fab fixed z-50 flex flex-col items-end gap-3">
       {open ? (
         <div
           role="dialog"
