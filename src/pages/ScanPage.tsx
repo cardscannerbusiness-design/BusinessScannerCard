@@ -8,6 +8,7 @@ import { PAGE } from "@/constants/navigation";
 import { listContacts } from "@/lib/contactStorage";
 import { CONNECTION_MODE_CHANGED, getConnectionMode } from "@/lib/connectionMode";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { loadUserSettings } from "@/lib/settingsStorage";
 import { getQueueItems, getCachedContacts, cacheContacts } from "@/lib/indexeddb";
 import { isValidCardImage, readFileAsDataUrl } from "@/lib/scanSession";
 import { toast } from "sonner";
@@ -32,7 +33,7 @@ export function ScanPage() {
   const [connectionMode, setConnectionMode] = useState<"online" | "offline">(() =>
     typeof window !== "undefined" ? getConnectionMode() : "online",
   );
-  const { firstName } = useUserSettings();
+  const { firstName, settings } = useUserSettings();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -211,11 +212,16 @@ export function ScanPage() {
     }, 350);
 
     try {
-      toast.info("Extracting contact details from card…");
+      const prefs = loadUserSettings();
+      const captureToasts =
+        prefs.notificationsEnabled && prefs.captureNotificationsEnabled;
+      if (captureToasts) {
+        toast.info("Extracting contact details from card…");
+      }
       const { scanFileAndStore } = await import("@/lib/scanPipeline");
       await scanFileAndStore(activeFile, activePreview, ({ progress, message }) => {
         setProgress(Math.max(10, progress));
-        if (progress >= 100) toast.success(message);
+        if (progress >= 100 && captureToasts) toast.success(message);
       });
       finishProcessing(autoNavigate);
     } catch (err) {
@@ -285,16 +291,22 @@ export function ScanPage() {
             <p className="text-xs text-muted-foreground">{dateStr}</p>
           </div>
           
-          <div 
-            className="flex flex-1 max-w-xl items-center justify-between gap-3 rounded-md border border-border/40 bg-muted/20 px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/40 transition-colors cursor-pointer select-none"
-            onClick={rotateTip}
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5 text-primary shrink-0 animate-pulse" />
-              <span className="font-medium text-foreground/90 transition-all duration-300">{tips[tipIndex]}</span>
+          {settings.showCaptureTips ? (
+            <div
+              className="flex flex-1 max-w-xl cursor-pointer select-none items-center justify-between gap-3 rounded-md border border-border/40 bg-muted/20 px-4 py-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/40"
+              onClick={rotateTip}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 shrink-0 animate-pulse text-primary" />
+                <span className="font-medium text-foreground/90 transition-all duration-300">
+                  {tips[tipIndex]}
+                </span>
+              </div>
+              <span className="ml-2 shrink-0 text-[10px] font-bold uppercase tracking-wider text-primary hover:underline">
+                Next tip
+              </span>
             </div>
-            <span className="text-[10px] uppercase font-bold tracking-wider text-primary hover:underline shrink-0 ml-2">Next Tip</span>
-          </div>
+          ) : null}
         </div>
       </div>
 

@@ -7,7 +7,7 @@ export const Route = createFileRoute("/settings")({
       { title: "Preferences · CardSync AI" },
       {
         name: "description",
-        content: "Profile, notifications, and appearance for your workspace.",
+        content: "Profile, notifications, terms, privacy, cookies, and device data for your workspace.",
       },
       { property: "og:title", content: "Preferences · CardSync AI" },
       { property: "og:description", content: "Configure your CardSync AI workspace." },

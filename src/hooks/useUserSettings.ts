@@ -28,6 +28,8 @@ export function useUserSettings() {
     settings,
     fullName: settings.fullName,
     email: settings.email,
+    phone: settings.phone,
+    company: settings.company,
     role: settings.role,
     initials: getUserInitials(settings.fullName),
     firstName: getUserFirstName(settings.fullName),

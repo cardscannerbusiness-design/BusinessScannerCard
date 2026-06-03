@@ -1,11 +1,10 @@
-import { Moon, Sun, UserCircle2, Settings, LogOut } from "lucide-react";
+import { UserCircle2, Settings, LogOut } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { HeaderSearch } from "@/components/layout/HeaderSearch";
 import { useCallback, useEffect, useState } from "react";
 import { getQueueItems } from "@/lib/indexeddb";
 import { seedOfflineSampleContact } from "@/lib/contactStorage";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +24,6 @@ import {
 export function TopBar() {
   const [connectionMode, setConnectionModeState] = useState<ConnectionMode>("online");
   const [pendingCount, setPendingCount] = useState(0);
-  const [dark, setDark] = useState(false);
   const { fullName: profileName, initials: profileInitials } = useUserSettings();
   const navigate = useNavigate();
 
@@ -56,9 +54,7 @@ export function TopBar() {
     if (typeof window === "undefined") return;
 
     updatePendingCount();
-    const stored = localStorage.getItem("cs-dark") === "1";
-    setDark(stored);
-    document.documentElement.classList.toggle("dark", stored);
+    document.documentElement.classList.remove("dark");
 
     syncConnectionModeWithNetwork();
     refreshConnectionMode();
@@ -92,13 +88,6 @@ export function TopBar() {
     };
   }, [refreshConnectionMode]);
 
-  const toggleTheme = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("cs-dark", next ? "1" : "0");
-  };
-
   return (
     <header className="grid h-14 shrink-0 grid-cols-[auto_1fr_auto] items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-4 md:px-6">
       <div className="flex min-w-0 items-center justify-start">
@@ -115,17 +104,6 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center justify-end gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={toggleTheme}
-          className="h-9 w-9 rounded-xl border-border/60 bg-card/60"
-          aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-          title={dark ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
-
         {pendingCount > 0 && (
           <div className="flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning-foreground shadow-soft">
             <span className="relative flex h-1.5 w-1.5">
@@ -162,7 +140,7 @@ export function TopBar() {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
               <Settings className="mr-2 h-4 w-4" />
-              Account Settings
+              Preferences
             </DropdownMenuItem>
             <DropdownMenuItem>
               <LogOut className="mr-2 h-4 w-4" />

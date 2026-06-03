@@ -27,6 +27,6 @@ export const PAGE = {
   },
   preferences: {
     title: "Preferences",
-    description: "Profile, notifications, and appearance.",
+    description: "Profile, notifications, legal policies, cookies, and device data.",
   },
 } as const;

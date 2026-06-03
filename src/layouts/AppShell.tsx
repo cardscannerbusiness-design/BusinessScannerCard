@@ -9,8 +9,10 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmModalProvider } from "@/components/ui/confirm-modal";
+import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import { getQueueItems } from "@/lib/indexeddb";
 import { syncAllQueueItemsToZoho } from "@/lib/contactStorage";
+import { loadUserSettings } from "@/lib/settingsStorage";
 export function AppShell() {
   const { queryClient } = useRouteContext({ from: "__root__" });
   const router = useRouter();
@@ -39,6 +41,9 @@ export function AppShell() {
     const processOfflineQueue = async () => {
       if (!navigator.onLine) return;
 
+      const prefs = loadUserSettings();
+      if (!prefs.autoSyncQueueWhenOnline) return;
+
       try {
         const queue = await getQueueItems();
         const unsynced = queue.filter(
@@ -46,9 +51,12 @@ export function AppShell() {
         );
         if (unsynced.length === 0) return;
 
-        toast.info(`Saving ${unsynced.length} queued contact(s) on this device…`);
+        const showToast = prefs.notificationsEnabled && prefs.queueNotificationsEnabled;
+        if (showToast) {
+          toast.info(`Saving ${unsynced.length} queued contact(s) on this device…`);
+        }
         const { synced, total } = await syncAllQueueItemsToZoho();
-        if (synced > 0) {
+        if (synced > 0 && showToast) {
           toast.success(`Saved ${synced} of ${total} contact(s) on this device.`);
         }
         window.dispatchEvent(new CustomEvent("cs-contacts-updated"));
@@ -106,6 +114,7 @@ export function AppShell() {
           </SidebarInset>
         </div>
         <Toaster position="top-right" />
+        <CookieConsentBanner />
       </SidebarProvider>
       </ConfirmModalProvider>
     </QueryClientProvider>

@@ -9,6 +9,7 @@ import { StatusPill } from "@/components/layout/StatusPill";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useConfirmModal } from "@/components/ui/confirm-modal";
+import { loadUserSettings } from "@/lib/settingsStorage";
 import {
   deleteContact,
   listContacts,
@@ -274,13 +275,15 @@ export function ContactsPage() {
   };
 
   const handleDelete = async (contact: Contact) => {
-    const ok = await confirm({
-      title: "Delete contact?",
-      description: "Are you sure you want to delete this contact? This cannot be undone.",
-      confirmLabel: "Delete",
-      destructive: true,
-    });
-    if (!ok) return;
+    if (loadUserSettings().confirmBeforeDelete) {
+      const ok = await confirm({
+        title: "Delete contact?",
+        description: "Are you sure you want to delete this contact? This cannot be undone.",
+        confirmLabel: "Delete",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
 
     if (contact.source === "queue") {
       try {
