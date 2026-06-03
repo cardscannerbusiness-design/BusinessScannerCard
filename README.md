@@ -2,6 +2,8 @@
 
 TanStack Start + React UI extracted from the monorepo `main/` folder. Talks to the Python API via `VITE_API_URL` (dev proxy targets `http://127.0.0.1:5000` by default).
 
+See [docs/STRUCTURE.md](docs/STRUCTURE.md) for how `routes/`, `pages/`, `layouts/`, and `components/` are organized.
+
 ## Run locally
 
 1. Start the **backend** API on port 5000 (see `../backend` or `../main` until backend is split).
