@@ -40,12 +40,12 @@ export const TIMEZONE_OPTIONS = [
 ] as const;
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
-  fullName: "Yogesh Vanaparti",
-  email: "yogesh@cardscannerbusiness.com",
-  phone: "+1 415 555 0142",
+  fullName: "Yogesh VR",
+  email: "yogeshvanaparthi@gmail.com",
+  phone: "9884993074",
   company: "CardSync AI",
   role: "Workspace owner",
-  timezone: "Pacific Time (US)",
+  timezone: "India Standard Time",
   notificationsEnabled: true,
   queueNotificationsEnabled: true,
   captureNotificationsEnabled: true,

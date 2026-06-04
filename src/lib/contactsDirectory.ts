@@ -81,6 +81,19 @@ export function subscribeContactsDirectory(listener: () => void): () => void {
 
 export function invalidateContactsDirectory(): void {
   cache = null;
+  inFlight = null;
+}
+
+/** Remove one row from cache immediately (e.g. after delete) without waiting for refetch. */
+export function optimisticallyRemoveDirectoryContact(
+  contact: Pick<DirectoryContact, "id" | "source">,
+): void {
+  const key = contactRowKey(contact);
+  if (!cache) return;
+  const nextContacts = cache.contacts.filter((c) => contactRowKey(c) !== key);
+  if (nextContacts.length === cache.contacts.length) return;
+  cache = { ...cache, contacts: nextContacts };
+  notifyContactsDirectorySubscribers();
 }
 
 function notifyContactsDirectorySubscribers(): void {
@@ -264,6 +277,10 @@ export async function loadContactsDirectory(options?: {
 }): Promise<ContactsDirectorySnapshot> {
   const force = options?.force ?? false;
   const now = Date.now();
+
+  if (force) {
+    inFlight = null;
+  }
 
   if (!force && cache && now - cache.fetchedAt < CACHE_TTL_MS) {
     return cache;

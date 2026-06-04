@@ -10,7 +10,6 @@ import { StatusPill } from "@/components/layout/StatusPill";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useConfirmModal } from "@/components/ui/confirm-modal";
-import { loadUserSettings } from "@/lib/settingsStorage";
 import {
   storageLabel,
   syncAllPendingToZohoStorage,
@@ -47,7 +46,8 @@ export function ContactsPage() {
   const setQ = (next: string) => {
     void navigate({ search: { q: next.trim() || undefined }, replace: true });
   };
-  const { contacts: contactsList, isLoading, isRefreshing, refresh } = useContactsDirectory();
+  const { contacts: contactsList, isLoading, isRefreshing, refresh, removeContact } =
+    useContactsDirectory();
   const showInitialLoading = isLoading && contactsList.length === 0;
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"all" | ContactStatus>("all");
@@ -165,21 +165,20 @@ export function ContactsPage() {
   };
 
   const handleDelete = async (contact: Contact) => {
-    if (loadUserSettings().confirmBeforeDelete) {
-      const ok = await confirm({
-        title: "Delete contact?",
-        description:
-          contact.source === "zoho"
-            ? "Remove this lead from Zoho CRM? This cannot be undone."
-            : "Are you sure you want to delete this contact? This cannot be undone.",
-        confirmLabel: "Delete",
-        destructive: true,
-      });
-      if (!ok) return;
-    }
+    const ok = await confirm({
+      title: "Delete contact?",
+      description:
+        contact.source === "zoho"
+          ? "Remove this lead from Zoho CRM? This cannot be undone."
+          : "Are you sure you want to delete this contact? This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
 
     try {
       await deleteDirectoryContact(contact);
+      removeContact(contact);
       if (contact.source === "zoho") {
         toast.success("Contact deleted from Zoho CRM.");
       } else if (contact.source === "queue") {
@@ -187,7 +186,7 @@ export function ContactsPage() {
       } else {
         toast.success("Contact deleted.");
       }
-      await reloadContacts({ force: true, silent: true });
+      void reloadContacts({ force: true, silent: true });
     } catch (err: unknown) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Failed to delete contact.");

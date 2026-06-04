@@ -11,8 +11,14 @@ import {
   Save,
   CalendarDays,
   TrendingUp,
+  Cloud,
+  Layers,
 } from "lucide-react";
 import { buildQueuePipelineSnapshot } from "@/lib/queueAnalytics";
+import {
+  loadCaptureSourceStats,
+  type CaptureSourceStats,
+} from "@/lib/captureSourceAnalytics";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +57,9 @@ export function QueuePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [syncingQueueId, setSyncingQueueId] = useState<string | null>(null);
+  const [captureStats, setCaptureStats] = useState<CaptureSourceStats>(() =>
+    loadCaptureSourceStats(),
+  );
 
   const loadData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
@@ -74,12 +83,16 @@ export function QueuePage() {
     window.addEventListener("cs-contacts-updated", refresh);
     window.addEventListener("focus", refresh);
 
+    const refreshCaptureStats = () => setCaptureStats(loadCaptureSourceStats());
+    window.addEventListener("cs-capture-stats-updated", refreshCaptureStats);
+
     const intervalId = window.setInterval(refresh, 15000);
 
     return () => {
       window.removeEventListener("cs-queue-updated", refresh);
       window.removeEventListener("cs-contacts-updated", refresh);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("cs-capture-stats-updated", refreshCaptureStats);
       window.clearInterval(intervalId);
     };
   }, [loadData]);
@@ -178,42 +191,61 @@ export function QueuePage() {
     const waiting = queueItems.filter(
       (i) => i.status === "pending" || i.status === "retrying",
     ).length;
+    const failed = queueItems.filter((i) => i.status === "failed").length;
+    const totalInQueueDb = queueItems.filter((i) => i.status !== "synced").length;
     const savedOnDevice = contacts.filter(isSavedOnDevice).length;
     const snapshot = buildQueuePipelineSnapshot(contacts, queueItems);
 
     return {
       waiting,
+      failed,
+      totalInQueueDb,
       savedOnDevice,
       savesToday: snapshot.savesToday,
       savesThisWeek: snapshot.savesThisWeek,
+      queuedOffline: captureStats.queuedOffline,
+      syncedFromQueue: captureStats.syncedFromQueue,
+      directToZoho: captureStats.directToZoho,
     };
-  }, [queueItems, contacts]);
+  }, [queueItems, contacts, captureStats]);
 
   const statWidgets = useMemo(
     () => [
       {
-        label: "In queue",
+        label: "Waiting now",
         value: stats.waiting,
         icon: Inbox,
         tone: "text-warning",
       },
       {
-        label: "Saved on device",
-        value: stats.savedOnDevice,
+        label: "In IndexedDB queue",
+        value: stats.totalInQueueDb,
+        icon: Layers,
+        tone: "text-warning",
+      },
+      {
+        label: "Synced from queue",
+        value: stats.syncedFromQueue,
         icon: HardDrive,
+        tone: "text-primary",
+      },
+      {
+        label: "Direct to Zoho",
+        value: stats.directToZoho,
+        icon: Cloud,
+        tone: "text-success",
+      },
+      {
+        label: "Offline captures",
+        value: stats.queuedOffline,
+        icon: TrendingUp,
         tone: "text-primary",
       },
       {
         label: "Saves today",
         value: stats.savesToday,
         icon: CalendarDays,
-        tone: "text-primary",
-      },
-      {
-        label: "Saves this week",
-        value: stats.savesThisWeek,
-        icon: TrendingUp,
-        tone: "text-success",
+        tone: "text-muted-foreground",
       },
     ],
     [stats],
@@ -296,18 +328,19 @@ export function QueuePage() {
           </div>
         </Card>
 
-        <Card className="rounded-2xl border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground shadow-soft sm:text-sm">
-          <span className="font-medium text-foreground">Storage:</span> This device only
-          (IndexedDB). <span className="text-foreground/80">No remote backend is connected.</span>
-        </Card>
-
+    
         {isLoading ? (
           <div className="flex min-h-[320px] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
           <div className="space-y-5 sm:space-y-6">
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            <p className="text-xs text-muted-foreground">
+              Offline saves are stored in IndexedDB (<span className="font-medium">source: queue</span> in
+              Contacts). Online saves go straight to Zoho (<span className="font-medium">source: zoho</span>) and
+              never enter the queue. Counters below track how each path was used on this device.
+            </p>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6 lg:gap-4">
               {statWidgets.map((s) => (
                 <Card key={s.label} className="rounded-2xl border-border/60 p-4 shadow-soft sm:p-5">
                   <div className="flex items-center justify-between">
@@ -380,6 +413,9 @@ export function QueuePage() {
                 <div className="flex flex-wrap gap-2 text-[11px]">
                   <span className="rounded-full bg-warning/10 px-2 py-0.5 font-medium text-warning">
                     Pending {pendingList.length}
+                  </span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">
+                    Total in DB {stats.totalInQueueDb}
                   </span>
                   <span className="rounded-full bg-destructive/10 px-2 py-0.5 font-medium text-destructive">
                     Failed {failedList.length}

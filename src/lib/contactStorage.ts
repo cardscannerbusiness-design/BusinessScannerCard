@@ -99,6 +99,8 @@ async function saveOfflineToIndexedDbQueue(
       errorMessage,
     ),
   );
+  const { recordOfflineQueueCapture } = await import("@/lib/captureSourceAnalytics");
+  recordOfflineQueueCapture();
   notifyContactsListChanged();
   return { id: queueId, queued: true };
 }
@@ -129,6 +131,8 @@ async function saveOnlineDirectToZoho(
       skipWhatsApp: options?.skipWhatsApp,
       skipEmail: options?.skipEmail,
     });
+    const { recordDirectZohoCapture } = await import("@/lib/captureSourceAnalytics");
+    recordDirectZohoCapture();
     notifyContactsListChanged();
     return {
       id: zoho.zohoLeadId || crypto.randomUUID(),
@@ -167,6 +171,8 @@ export async function syncQueueItemToZoho(
     skipEmail: options?.skipEmail,
   });
   await removeQueueItem(item.id);
+  const { recordQueueSyncedToZoho } = await import("@/lib/captureSourceAnalytics");
+  recordQueueSyncedToZoho();
   notifyContactsListChanged();
   return {
     zohoLeadId: result.zohoLeadId,
@@ -393,6 +399,7 @@ export function buildQueueItemFromPayload(
       ...(payload as Record<string, unknown>),
       email,
       emailAddress: email,
+      captureSource: "offline_queue",
     },
     image_base64: imageBase64,
     status: "pending",

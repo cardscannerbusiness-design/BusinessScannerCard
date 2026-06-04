@@ -324,18 +324,6 @@ export function SettingsPage() {
                 }
               }}
             />
-            <SettingRow
-              title="Confirm before delete"
-              description="Ask for confirmation when removing a contact"
-              checked={profile.confirmBeforeDelete}
-              onCheckedChange={(v) =>
-                persistToggle(
-                  "confirmBeforeDelete",
-                  v,
-                  v ? "Delete confirmation enabled." : "Delete confirmation disabled.",
-                )
-              }
-            />
           </div>
         </Card>
 
@@ -396,16 +384,6 @@ export function SettingsPage() {
               Cookie consent pending — use the cookie icon at the bottom-right or enable analytics above.
             </p>
           ) : null}
-        </Card>
-
-        <Card className="rounded-2xl border-border/60 bg-muted/20 p-6 shadow-soft lg:col-span-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Wifi className="h-4 w-4" /> About this device
-          </div>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Online saves go to Zoho CRM with email follow-up. Offline captures are queued on this device (IndexedDB) until you reconnect.
-            Profile, notifications, and legal preferences are saved locally on this machine only.
-          </p>
         </Card>
 
         <Card className="rounded-2xl border-destructive/20 bg-destructive/5 p-6 shadow-soft lg:col-span-2">

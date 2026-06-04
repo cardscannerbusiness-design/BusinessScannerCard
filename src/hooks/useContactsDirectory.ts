@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  contactRowKey,
   getContactsDirectorySnapshot,
-  invalidateContactsDirectory,
   loadContactsDirectory,
+  optimisticallyRemoveDirectoryContact,
   subscribeContactsDirectory,
   type ContactsDirectorySnapshot,
   type DirectoryContact,
@@ -36,6 +37,11 @@ export function useContactsDirectory(options?: { autoLoad?: boolean }) {
     [applySnapshot],
   );
 
+  const removeContact = useCallback((contact: Pick<DirectoryContact, "id" | "source">) => {
+    optimisticallyRemoveDirectoryContact(contact);
+    setContacts((prev) => prev.filter((c) => contactRowKey(c) !== contactRowKey(contact)));
+  }, []);
+
   const refresh = useCallback(
     async (opts?: { silent?: boolean; force?: boolean }) => {
       const silent = opts?.silent ?? hasLoadedOnceRef.current;
@@ -68,7 +74,6 @@ export function useContactsDirectory(options?: { autoLoad?: boolean }) {
     void refresh({ silent: hasCachedData, force: false });
 
     const onDataChanged = () => {
-      invalidateContactsDirectory();
       void refresh({ silent: true, force: true });
     };
 
@@ -81,5 +86,5 @@ export function useContactsDirectory(options?: { autoLoad?: boolean }) {
     };
   }, [autoLoad, refresh, hasCachedData]);
 
-  return { contacts, isLoading, isRefreshing, fetchFailed, refresh };
+  return { contacts, isLoading, isRefreshing, fetchFailed, refresh, removeContact };
 }
