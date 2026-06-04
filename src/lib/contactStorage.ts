@@ -1,10 +1,6 @@
 import type { LeadPayload } from "@/lib/cardImage";
-import { API_BASE_URL } from "@/lib/api";
-import { isOfflineMode } from "@/lib/connectionMode";
+import { pickPrimaryEmail } from "@/lib/contactEmail";
 import {
-  getContactStorageMode,
-  isIndexedDbStorage,
-  isServerStorage,
   setResolvedStorageMode,
   storageLabel,
   type ContactStorageMode,
@@ -23,111 +19,168 @@ import {
   type QueueItem,
 } from "@/lib/indexeddb";
 import {
-  checkLocalDbHealth,
-  deleteLocalContact,
-  getLocalContactById,
-  listLocalContacts,
   localContactToPayload,
-  markLocalContactSyncedZoho,
   queueContactToPayload,
-  saveContactToLocalDb,
-  syncLocalContactToZoho,
-  syncAllLocalPendingToZoho,
-  syncQueueItemToLocalDb,
-  updateContactInLocalDb,
   type LocalContact,
 } from "@/lib/localContactApi";
 import { syncPayloadToZoho, seedOfflineSampleContact } from "@/lib/contactApi";
 
-export type StoredContact = LocalContact;
+export type StoredContact = Awaited<ReturnType<typeof listStoredContacts>>[number];
 
 export {
-  getContactStorageMode,
   isIndexedDbStorage,
-  isServerStorage,
   storageLabel,
   type ContactStorageMode,
-};
+} from "@/lib/storageConfig";
 
-export { queueContactToPayload, localContactToPayload, syncQueueItemToLocalDb, seedOfflineSampleContact };
+export { queueContactToPayload, localContactToPayload, seedOfflineSampleContact };
 
 export async function resolveStorageMode(): Promise<ContactStorageMode> {
-  const viteMode = getContactStorageMode();
-  if (viteMode === "indexeddb") {
-    setResolvedStorageMode("indexeddb");
-    return "indexeddb";
-  }
-  try {
-    const cfg = await fetchStorageConfig();
-    setResolvedStorageMode(cfg.storage);
-    return cfg.storage;
-  } catch {
-    setResolvedStorageMode(viteMode);
-    return viteMode;
-  }
+  setResolvedStorageMode("indexeddb");
+  return "indexeddb";
 }
 
 export async function checkStorageHealth(): Promise<boolean> {
   await resolveStorageMode();
-  if (isIndexedDbStorage()) {
-    return true;
-  }
-  return checkLocalDbHealth();
+  return true;
 }
 
 export async function listContacts(): Promise<StoredContact[]> {
   await resolveStorageMode();
-  if (isIndexedDbStorage()) {
-    return listStoredContacts() as Promise<StoredContact[]>;
-  }
-  const up = await checkStorageHealth();
-  if (!up) {
-    const { getCachedContacts } = await import("@/lib/indexeddb");
-    return getCachedContacts() as Promise<StoredContact[]>;
-  }
-  return listLocalContacts();
+  return listStoredContacts() as Promise<StoredContact[]>;
 }
 
 export async function getContactById(contactId: string): Promise<StoredContact | null> {
-  if (isIndexedDbStorage()) {
-    const contact = await getStoredContactById(contactId);
-    return contact as StoredContact | null;
-  }
-  try {
-    return await getLocalContactById(contactId);
-  } catch {
-    return null;
-  }
+  const contact = await getStoredContactById(contactId);
+  return contact as StoredContact | null;
 }
 
+/** Offline = no internet (or explicit offline). Online = Zoho + email. */
 function isOfflineSave(options?: { connectionMode?: "online" | "offline" }): boolean {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
   if (options?.connectionMode === "offline") return true;
   if (options?.connectionMode === "online") return false;
-  return isOfflineMode();
+  return false;
 }
 
-/** Push one browser queue row to Zoho via Python API, then store locally and remove from queue. */
-export async function syncQueueItemToZoho(item: QueueItem): Promise<{ zohoLeadId?: string }> {
+function saveConnectionMode(): "online" | "offline" {
+  return typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline";
+}
+
+function notifyContactsListChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("cs-contacts-updated"));
+    void import("@/lib/contactsDirectory").then((m) => m.invalidateContactsDirectory());
+  }
+}
+
+type ZohoSaveFields = {
+  zohoLeadId?: string;
+  zohoSynced?: boolean;
+  alreadySynced?: boolean;
+  zohoError?: string;
+  emailSent?: boolean;
+  emailError?: string | null;
+  emailTo?: string | null;
+  emailExtracted?: string | null;
+};
+
+async function saveOfflineToIndexedDbQueue(
+  payload: LeadPayload,
+  cardImageBase64?: string,
+  errorMessage = "Saved offline — will sync to Zoho when online",
+): Promise<{ id: string; queued: true }> {
+  const queueId = crypto.randomUUID();
+  const email = pickPrimaryEmail(payload);
+  await addToQueue(
+    buildQueueItemFromPayload(
+      { ...payload, email },
+      cardImageBase64,
+      errorMessage,
+    ),
+  );
+  notifyContactsListChanged();
+  return { id: queueId, queued: true };
+}
+
+async function saveOnlineDirectToZoho(
+  payload: LeadPayload,
+  cardImageBase64?: string,
+  options?: {
+    skipWhatsApp?: boolean;
+    skipEmail?: boolean;
+  },
+): Promise<{ id: string; queued?: boolean } & ZohoSaveFields> {
+  const email = pickPrimaryEmail(payload);
+  const body = { ...payload, email };
+
+  if (!options?.skipEmail && !email) {
+    return {
+      id: crypto.randomUUID(),
+      zohoError: "Email is required for thank-you email. Fill the Email field on Review.",
+      emailError: "No email address on this contact.",
+      emailExtracted: null,
+    };
+  }
+
+  try {
+    const zoho = await syncPayloadToZoho(body, {
+      connectionMode: "online",
+      skipWhatsApp: options?.skipWhatsApp,
+      skipEmail: options?.skipEmail,
+    });
+    notifyContactsListChanged();
+    return {
+      id: zoho.zohoLeadId || crypto.randomUUID(),
+      zohoLeadId: zoho.zohoLeadId,
+      zohoSynced: Boolean(zoho.zohoLeadId),
+      alreadySynced: zoho.alreadySynced,
+      emailSent: zoho.emailSent,
+      emailError: zoho.emailError,
+      emailTo: zoho.emailTo,
+      emailExtracted: zoho.emailExtracted || email || null,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Zoho sync failed";
+    const fallback = await saveOfflineToIndexedDbQueue(body, cardImageBase64, message);
+    return { ...fallback, zohoError: message };
+  }
+}
+
+export async function syncQueueItemToZoho(
+  item: QueueItem,
+  options?: { skipWhatsApp?: boolean; skipEmail?: boolean },
+): Promise<{
+  zohoLeadId?: string;
+  emailSent?: boolean;
+  emailError?: string | null;
+  emailTo?: string | null;
+  emailExtracted?: string | null;
+}> {
   if (!navigator.onLine) {
     throw new Error("No internet. Connect to sync to Zoho CRM.");
   }
   const payload = queueContactToPayload(item.contact_data);
-  const result = await syncPayloadToZoho(payload, { connectionMode: "online" });
-  const zohoLeadId = result.zohoLeadId;
-  await saveStoredContact(
-    {
-      ...(item.contact_data as Record<string, unknown>),
-      syncStatus: "synced_zoho",
-      zohoLeadId: zohoLeadId ?? null,
-    },
-    item.image_base64,
-  );
+  const result = await syncPayloadToZoho(payload, {
+    connectionMode: "online",
+    skipWhatsApp: options?.skipWhatsApp,
+    skipEmail: options?.skipEmail,
+  });
   await removeQueueItem(item.id);
-  return { zohoLeadId };
+  notifyContactsListChanged();
+  return {
+    zohoLeadId: result.zohoLeadId,
+    emailSent: result.emailSent,
+    emailError: result.emailError,
+    emailTo: result.emailTo,
+    emailExtracted: result.emailExtracted || pickPrimaryEmail(payload),
+  };
 }
 
-export async function syncAllQueueItemsToZoho(): Promise<{ synced: number; total: number }> {
+export async function syncAllQueueItemsToZoho(options?: {
+  skipWhatsApp?: boolean;
+  skipEmail?: boolean;
+}): Promise<{ synced: number; total: number }> {
   const items = await getQueueItems();
   const pending = items.filter((i) => i.status === "pending" || i.status === "retrying");
   let synced = 0;
@@ -138,7 +191,7 @@ export async function syncAllQueueItemsToZoho(): Promise<{ synced: number; total
         status: "retrying",
         last_attempt: new Date().toISOString(),
       });
-      await syncQueueItemToZoho(item);
+      await syncQueueItemToZoho(item, options);
       synced += 1;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Zoho sync failed";
@@ -170,153 +223,162 @@ export async function saveContact(
   zohoSynced?: boolean;
   alreadySynced?: boolean;
   zohoError?: string;
+  emailSent?: boolean;
+  emailError?: string | null;
+  emailTo?: string | null;
+  emailExtracted?: string | null;
 }> {
   await resolveStorageMode();
-  if (isIndexedDbStorage() && isOfflineSave(options)) {
-    const queueId = crypto.randomUUID();
-    await addToQueue(
-      buildQueueItemFromPayload(
-        payload,
-        cardImageBase64,
-        "Saved offline — will sync to Zoho when online",
-      ),
-    );
-    return { id: queueId, queued: true };
+  const mode = options?.connectionMode ?? saveConnectionMode();
+
+  if (isOfflineSave({ ...options, connectionMode: mode })) {
+    return saveOfflineToIndexedDbQueue(payload, cardImageBase64);
   }
 
-  if (isIndexedDbStorage()) {
-    const saved = await saveStoredContact(payload as Record<string, unknown>, cardImageBase64);
-    return { id: saved.id };
-  }
-
-  const up = await checkStorageHealth();
-  if (up) {
-    const saved = await saveContactToLocalDb(payload, cardImageBase64, options);
-    return {
-      id: saved.id,
-      zohoLeadId: saved.zohoLeadId,
-      zohoSynced: saved.zohoSynced,
-      alreadySynced: saved.alreadySynced,
-      zohoError: saved.zohoError,
-    };
-  }
-
-  const queueId = crypto.randomUUID();
-  await addToQueue({
-    id: queueId,
-    contact_data: payload as Record<string, unknown>,
-    image_base64: cardImageBase64,
-    status: "pending",
-    retry_count: 0,
-    created_at: new Date().toISOString(),
-    last_attempt: new Date().toISOString(),
-    error_message: `${storageLabel()} unavailable — start Python backend (npm run server)`,
-  });
-  return { id: queueId, queued: true };
+  return saveOnlineDirectToZoho(payload, cardImageBase64, options);
 }
 
 export async function updateContact(contactId: string, payload: LeadPayload): Promise<void> {
-  if (isIndexedDbStorage()) {
-    await updateStoredContact(contactId, payload as Record<string, unknown>);
-    return;
+  const existing = await getStoredContactById(contactId);
+  if (existing) {
+    const email = pickPrimaryEmail(payload);
+    await updateStoredContact(contactId, {
+      ...(payload as Record<string, unknown>),
+      email,
+      emailAddress: email,
+    });
   }
-  await updateContactInLocalDb(contactId, payload);
 }
 
-export async function deleteContact(contactId: string, deleteZoho = false): Promise<void> {
-  if (isIndexedDbStorage()) {
-    await deleteStoredContact(contactId);
-    return;
-  }
-  await deleteLocalContact(contactId, deleteZoho);
+export async function deleteContact(contactId: string): Promise<void> {
+  await deleteStoredContact(contactId);
 }
 
-export async function markContactSyncedZoho(contactId: string, zohoLeadId: string): Promise<void> {
-  if (isIndexedDbStorage()) {
-    await patchStoredContactSyncStatus(contactId, "synced_zoho", zohoLeadId);
-    return;
-  }
-  await markLocalContactSyncedZoho(contactId, zohoLeadId);
+export async function markContactSyncedZoho(
+  contactId: string,
+  zohoLeadId: string,
+): Promise<void> {
+  await patchStoredContactSyncStatus(contactId, "synced_zoho", zohoLeadId);
 }
 
 export async function syncContactToZohoStorage(
   contactId: string,
   options?: { skipWhatsApp?: boolean; skipEmail?: boolean },
-): Promise<{ zohoLeadId?: string; alreadySynced?: boolean }> {
-  if (isIndexedDbStorage()) {
-    const contact = await getStoredContactById(contactId);
-    if (!contact) {
-      throw new Error("Contact not found in IndexedDB");
-    }
-    if (contact.zohoLeadId || contact.syncStatus === "synced_zoho") {
-      return {
-        zohoLeadId: String(contact.zohoLeadId || ""),
-        alreadySynced: true,
-      };
-    }
-    const payload = localContactToPayload(contact as StoredContact);
-    const result = await syncPayloadToZoho(
-      {
-        ...payload,
-        zohoLeadId: contact.zohoLeadId as string | null | undefined,
-      },
-      options,
+  payloadOverride?: LeadPayload,
+): Promise<{
+  zohoLeadId?: string;
+  alreadySynced?: boolean;
+  emailSent?: boolean;
+  emailError?: string | null;
+  emailTo?: string | null;
+  emailExtracted?: string | null;
+}> {
+  let payload = payloadOverride;
+  let alreadyInZoho = false;
+  const contact = await getStoredContactById(contactId);
+  if (contact) {
+    payload = payload ?? localContactToPayload(contact as LocalContact);
+    alreadyInZoho = Boolean(
+      contact.zohoLeadId || contact.syncStatus === "synced_zoho",
     );
-    if (result.zohoLeadId) {
-      await markContactSyncedZoho(contactId, result.zohoLeadId);
-    }
-    return result;
   }
-  return syncLocalContactToZoho(contactId, options);
+
+  if (!payload) {
+    throw new Error("Contact not found for Zoho sync");
+  }
+
+  const email = pickPrimaryEmail(payload);
+  const result = await syncPayloadToZoho(
+    {
+      ...payload,
+      email,
+      zohoLeadId:
+        (payload as LeadPayload & { zohoLeadId?: string | null }).zohoLeadId ??
+        contactId,
+    },
+    { connectionMode: "online", ...options },
+  );
+
+  if (contact && result.zohoLeadId) {
+    await markContactSyncedZoho(contactId, result.zohoLeadId);
+  }
+
+  notifyContactsListChanged();
+  return {
+    ...result,
+    zohoLeadId: result.zohoLeadId || contactId,
+    alreadySynced: alreadyInZoho || result.alreadySynced,
+    emailExtracted: result.emailExtracted || email || null,
+  };
 }
 
-export async function syncAllPendingToZohoStorage(): Promise<{ synced: number; total: number }> {
-  if (isIndexedDbStorage()) {
-    const contacts = await listStoredContacts();
-    const pending = contacts.filter(
-      (c) => c.syncStatus !== "synced_zoho" && !c.zohoLeadId,
-    );
-    let synced = 0;
-    for (const contact of pending) {
-      const id = String(contact.id || "");
-      if (!id) continue;
-      try {
-        const result = await syncContactToZohoStorage(id);
-        if (result.zohoLeadId || result.alreadySynced) {
-          synced += 1;
-        }
-      } catch {
-        /* continue */
+export async function syncAllPendingToZohoStorage(options?: {
+  skipWhatsApp?: boolean;
+  skipEmail?: boolean;
+}): Promise<{ synced: number; total: number }> {
+  const contacts = await listStoredContacts();
+  const pending = contacts.filter(
+    (c) => c.syncStatus !== "synced_zoho" && !c.zohoLeadId,
+  );
+  let synced = 0;
+  for (const contact of pending) {
+    const id = String(contact.id || "");
+    if (!id) continue;
+    try {
+      const result = await syncContactToZohoStorage(id, options);
+      if (result.zohoLeadId || result.alreadySynced) {
+        synced += 1;
       }
+    } catch {
+      /* continue */
     }
-    return { synced, total: pending.length };
   }
-  return syncAllLocalPendingToZoho();
+  return { synced, total: pending.length };
+}
+
+export type AutoZohoSyncResult = {
+  queueSynced: number;
+  queueTotal: number;
+  contactsSynced: number;
+  contactsTotal: number;
+};
+
+let autoZohoSyncInFlight: Promise<AutoZohoSyncResult> | null = null;
+
+export async function runAutoZohoSyncWhenOnline(options?: {
+  skipWhatsApp?: boolean;
+  skipEmail?: boolean;
+}): Promise<AutoZohoSyncResult> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return { queueSynced: 0, queueTotal: 0, contactsSynced: 0, contactsTotal: 0 };
+  }
+
+  if (autoZohoSyncInFlight) {
+    return autoZohoSyncInFlight;
+  }
+
+  autoZohoSyncInFlight = (async () => {
+    const queue = await syncAllQueueItemsToZoho(options);
+    const contacts = await syncAllPendingToZohoStorage(options);
+    return {
+      queueSynced: queue.synced,
+      queueTotal: queue.total,
+      contactsSynced: contacts.synced,
+      contactsTotal: contacts.total,
+    };
+  })().finally(() => {
+    autoZohoSyncInFlight = null;
+  });
+
+  return autoZohoSyncInFlight;
 }
 
 export function isContactPendingZoho(contact: StoredContact): boolean {
   return contact.syncStatus !== "synced_zoho" && !contact.zohoLeadId;
 }
 
-export async function fetchStorageConfig(): Promise<{
-  storage: ContactStorageMode;
-  database: { ok?: boolean; storage?: string; error?: string };
-}> {
-  const res = await fetch(`${API_BASE_URL}/api/storage/config`, {
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!res.ok) {
-    throw new Error(`Storage config unavailable (${res.status})`);
-  }
-  return res.json();
-}
-
-export function shouldUseOfflineQueue(): boolean {
-  return isServerStorage();
-}
-
 export function shouldUseIndexedDbQueueSync(): boolean {
-  return isIndexedDbStorage();
+  return true;
 }
 
 export function buildQueueItemFromPayload(
@@ -324,9 +386,14 @@ export function buildQueueItemFromPayload(
   imageBase64?: string,
   errorMessage?: string,
 ): QueueItem {
+  const email = pickPrimaryEmail(payload);
   return {
     id: crypto.randomUUID(),
-    contact_data: payload as Record<string, unknown>,
+    contact_data: {
+      ...(payload as Record<string, unknown>),
+      email,
+      emailAddress: email,
+    },
     image_base64: imageBase64,
     status: "pending",
     retry_count: 0,

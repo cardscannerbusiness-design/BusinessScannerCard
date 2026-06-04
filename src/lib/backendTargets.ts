@@ -21,11 +21,10 @@ export function isLocalScanBackend(): boolean {
 }
 
 /**
- * OCR can run when online, offline with a local Python backend,
- * or via browser-side fallback if the local backend is unavailable.
+ * OCR runs in the browser (Tesseract.js). Backend receives extracted fields on save/sync.
  */
 export function canRunScanOcr(): boolean {
-  return typeof navigator === "undefined" || navigator.onLine || isLocalScanBackend();
+  return typeof window !== "undefined";
 }
 
 export function getScanBackendLabel(): string {

@@ -1,5 +1,5 @@
 /**
- * Quick check: built scanPipeline routes offline vs online correctly.
+ * Quick check: scanPipeline uses browser OCR only (no /scan-card).
  * Run after: npm run build
  */
 import { readFileSync, readdirSync } from "node:fs";
@@ -16,15 +16,15 @@ if (!files.length) {
 
 const bundle = readFileSync(join(assetsDir, files[0]), "utf8");
 const checks = [
-  ["Offline: browser Tesseract message", "Running browser Tesseract (offline)"],
-  ["Online: server OCR message", "Running server OCR"],
-  ["Online: scanCardImage API", "scan-card"],
-  ["Server OCR fallback when empty", "Server OCR empty"],
+  ["Browser OCR message", "Extracting contact details on device"],
+  ["No server scan-card call", "scan-card"],
+  ["Uses browserOcr", "browserOcr"],
 ];
 
 let failed = 0;
 for (const [label, needle] of checks) {
-  const ok = bundle.includes(needle);
+  const isNegative = label.startsWith("No ");
+  const ok = isNegative ? !bundle.includes(needle) : bundle.includes(needle);
   console.log(`${ok ? "OK" : "FAIL"}  ${label}`);
   if (!ok) failed += 1;
 }

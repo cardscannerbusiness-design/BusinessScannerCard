@@ -30,7 +30,8 @@ import {
   type DuplicateAction,
 } from "@/components/review/DuplicateResolutionModal";
 import { buildContactBody, resolveCardImageFile, type LeadPayload } from "@/lib/cardImage";
-import { getConnectionMode, isOfflineMode } from "@/lib/connectionMode";
+import { isOfflineMode } from "@/lib/connectionMode";
+import { pickPrimaryEmail } from "@/lib/contactEmail";
 import {
   checkStorageHealth,
   saveContact,
@@ -39,6 +40,7 @@ import {
   syncContactToZohoStorage,
 } from "@/lib/contactStorage";
 import { checkForDuplicates, type DuplicateMatch } from "@/lib/duplicateDetection";
+import { notifyOutreachAfterSync } from "@/lib/outreachFeedback";
 import { loadUserSettings } from "@/lib/settingsStorage";
 import { parseScanContact } from "@/lib/scanResult";
 import { scanFileAndStore } from "@/lib/scanPipeline";
@@ -258,7 +260,9 @@ export const ReviewPage = () => {
     company: form.values.companyName,
     phone: form.values.phoneNumber,
     secondaryPhone: form.values.secondaryPhoneNumber,
-    email: form.values.emailAddress,
+    email:
+      form.values.emailAddress.trim() ||
+      form.values.secondaryEmailAddress.trim(),
     secondaryEmail: form.values.secondaryEmailAddress,
     website: form.values.website,
     secondaryWebsite: form.values.secondaryWebsite,
@@ -282,25 +286,47 @@ export const ReviewPage = () => {
       let contactId = existingId;
 
       if (existingId) {
-        if (merge && duplicateMatch) {
-          const existing = duplicateMatch.contact;
-          const merged: LeadPayload = {
-            ...payload,
-            phone: payload.phone || String(existing.phone || ""),
-            email: payload.email || String(existing.email || ""),
-            website: payload.website || String(existing.website || ""),
-            address: payload.address || String(existing.address || ""),
-          };
-          await updateContact(existingId, merged);
-        } else {
-          await updateContact(existingId, payload);
+        const updatePayload =
+          merge && duplicateMatch
+            ? {
+                ...payload,
+                phone: payload.phone || String(duplicateMatch.contact.phone || ""),
+                email: payload.email || String(duplicateMatch.contact.email || ""),
+                website: payload.website || String(duplicateMatch.contact.website || ""),
+                address: payload.address || String(duplicateMatch.contact.address || ""),
+              }
+            : payload;
+        await updateContact(existingId, updatePayload);
+
+        if (!isOfflineMode() && navigator.onLine) {
+          const settings = loadUserSettings();
+          try {
+            const zohoResult = await syncContactToZohoStorage(
+              existingId,
+              {
+                skipWhatsApp: !settings.whatsappNotificationsEnabled,
+                skipEmail:
+                  !settings.emailNotificationsEnabled ||
+                  !pickPrimaryEmail(updatePayload),
+              },
+              updatePayload,
+            );
+            if (zohoResult.zohoLeadId) {
+              notifyOutreachAfterSync(settings, zohoResult);
+            }
+          } catch (zohoErr: unknown) {
+            const msg =
+              zohoErr instanceof Error ? zohoErr.message : "Zoho sync failed";
+            error(`Zoho sync failed: ${msg}. Use Sync to Zoho on Contacts.`);
+          }
         }
       } else {
         const settings = loadUserSettings();
+        const online = typeof navigator !== "undefined" && navigator.onLine;
         const saved = await saveContact(payload, imageDataUrl, {
-          connectionMode: getConnectionMode(),
+          connectionMode: online ? "online" : "offline",
           skipWhatsApp: !settings.whatsappNotificationsEnabled,
-          skipEmail: !settings.emailNotificationsEnabled,
+          skipEmail: !settings.emailNotificationsEnabled || !pickPrimaryEmail(payload),
         });
         contactId = saved.id;
 
@@ -320,41 +346,15 @@ export const ReviewPage = () => {
             error(`Zoho sync failed: ${saved.zohoError}. Use Sync to Zoho on Contacts.`);
           } else if (saved.alreadySynced) {
             success("Saved — contact is already in Zoho CRM.");
+            notifyOutreachAfterSync(settings, saved);
           } else {
             success("Saved and synced to Zoho CRM.");
-            if (
-              settings.emailNotificationsEnabled ||
-              settings.whatsappNotificationsEnabled
-            ) {
-              info("Thank-you email/WhatsApp are sending in the background.");
-            }
+            notifyOutreachAfterSync(settings, saved);
           }
-        } else if (!existingId) {
-          const shouldSyncZoho =
-            !isOfflineMode() && navigator.onLine && Boolean(contactId);
-
-          if (shouldSyncZoho && contactId) {
-            try {
-              const settings = loadUserSettings();
-              const zohoResult = await syncContactToZohoStorage(contactId, {
-                skipWhatsApp: !settings.whatsappNotificationsEnabled,
-                skipEmail: !settings.emailNotificationsEnabled,
-              });
-              if (zohoResult.alreadySynced) {
-                success("Saved — contact is already in Zoho CRM.");
-              } else {
-                success("Saved and synced to Zoho CRM.");
-                info("Thank-you email/WhatsApp are sending in the background.");
-              }
-            } catch (zohoErr: unknown) {
-              const msg =
-                zohoErr instanceof Error ? zohoErr.message : "Zoho sync failed";
-              success(`Saved to ${label}.`);
-              error(`Zoho sync failed: ${msg}. Use Sync to Zoho on Contacts.`);
-            }
-          } else {
-            success(`Saved to ${label}. Sync to Zoho from Contacts when online.`);
-          }
+        } else if (saved.queued) {
+          info("Zoho sync failed — contact queued on device. Retry when online.");
+        } else {
+          success(`Saved to ${label}. Sync to Zoho from Contacts when online.`);
         }
       }
 
@@ -368,10 +368,11 @@ export const ReviewPage = () => {
     }
 
     const settings = loadUserSettings();
+    const online = typeof navigator !== "undefined" && navigator.onLine;
     const saved = await saveContact(payload, imageDataUrl, {
-      connectionMode: getConnectionMode(),
+      connectionMode: online ? "online" : "offline",
       skipWhatsApp: !settings.whatsappNotificationsEnabled,
-      skipEmail: !settings.emailNotificationsEnabled,
+      skipEmail: !settings.emailNotificationsEnabled || !pickPrimaryEmail(payload),
     });
     info("Saved to browser queue. Will sync when storage is available.");
     sessionStorage.removeItem("latestScanResult");

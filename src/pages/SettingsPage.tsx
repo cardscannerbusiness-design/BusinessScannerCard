@@ -301,16 +301,28 @@ export function SettingsPage() {
               }}
             />
             <SettingRow
-              title="Auto-save queue when online"
-              description="Move queued cards into your directory when connection returns"
-              checked={profile.autoSyncQueueWhenOnline}
-              onCheckedChange={(v) =>
+              icon={<Wifi className="h-4 w-4" />}
+              title="Auto-sync to Zoho CRM when online"
+              description="When back online, sync the offline queue to Zoho CRM and send email follow-ups"
+              checked={profile.autoSyncToZohoWhenOnline}
+              onCheckedChange={(v) => {
                 persistToggle(
-                  "autoSyncQueueWhenOnline",
+                  "autoSyncToZohoWhenOnline",
                   v,
-                  v ? "Auto-save queue enabled." : "Auto-save queue disabled.",
-                )
-              }
+                  v ? "Auto-sync to Zoho enabled." : "Auto-sync to Zoho disabled.",
+                );
+                if (v && typeof navigator !== "undefined" && navigator.onLine) {
+                  void import("@/lib/autoZohoSync").then(({ maybeAutoSyncToZohoWhenOnline }) =>
+                    maybeAutoSyncToZohoWhenOnline().then((summary) => {
+                      if (summary.ran && summary.queueSynced + summary.contactsSynced > 0) {
+                        toast.success("Pending contacts synced to Zoho CRM.");
+                        window.dispatchEvent(new CustomEvent("cs-contacts-updated"));
+                        window.dispatchEvent(new CustomEvent("cs-queue-updated"));
+                      }
+                    }),
+                  );
+                }
+              }}
             />
             <SettingRow
               title="Confirm before delete"
@@ -391,7 +403,7 @@ export function SettingsPage() {
             <Wifi className="h-4 w-4" /> About this device
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
-            CardSync stores contacts and queue data in your browser (IndexedDB). OCR runs on-device.
+            Online saves go to Zoho CRM with email follow-up. Offline captures are queued on this device (IndexedDB) until you reconnect.
             Profile, notifications, and legal preferences are saved locally on this machine only.
           </p>
         </Card>

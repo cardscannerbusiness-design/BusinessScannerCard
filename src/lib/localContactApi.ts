@@ -90,6 +90,10 @@ export type SaveContactResult = {
   zohoSynced?: boolean;
   alreadySynced?: boolean;
   zohoError?: string;
+  emailSent?: boolean;
+  emailError?: string | null;
+  emailTo?: string | null;
+  emailExtracted?: string | null;
 };
 
 export async function saveContactToLocalDb(
@@ -106,6 +110,10 @@ export async function saveContactToLocalDb(
   const data = (await response.json()) as SaveContactResult & {
     detail?: string;
     error?: string;
+    email_sent?: boolean;
+    email_error?: string | null;
+    email_to?: string | null;
+    email_extracted?: string | null;
   };
   if (!response.ok) {
     throw new Error(
@@ -121,6 +129,10 @@ export async function saveContactToLocalDb(
     zohoSynced: data.zohoSynced,
     alreadySynced: data.alreadySynced,
     zohoError: data.zohoError,
+    emailSent: Boolean(data.email_sent ?? data.emailSent),
+    emailError: data.email_error ?? data.emailError ?? null,
+    emailTo: data.email_to ?? data.emailTo ?? null,
+    emailExtracted: data.email_extracted ?? data.emailExtracted ?? null,
   };
 }
 
@@ -176,8 +188,14 @@ export function queueContactToPayload(contactData: Record<string, unknown>): Lea
     company: String(contactData.company || ""),
     phone: String(contactData.phone || ""),
     secondaryPhone: String(contactData.secondaryPhone || ""),
-    email: String(contactData.email || ""),
-    secondaryEmail: String(contactData.secondaryEmail || ""),
+    email: String(
+      contactData.email ||
+        contactData.emailAddress ||
+        contactData.secondaryEmail ||
+        contactData.secondaryEmailAddress ||
+        "",
+    ),
+    secondaryEmail: String(contactData.secondaryEmail || contactData.secondaryEmailAddress || ""),
     website: String(contactData.website || ""),
     secondaryWebsite: String(contactData.secondaryWebsite || ""),
     address: String(contactData.address || ""),
@@ -227,7 +245,7 @@ export function localContactToPayload(contact: LocalContact): LeadPayload {
     designation: contact.designation || "",
     company: contact.company || "",
     phone: contact.phone || "",
-    email: contact.email || "",
+    email: contact.email || String((contact as { emailAddress?: string }).emailAddress || ""),
     website: contact.website || "",
     address: contact.address || "",
   };

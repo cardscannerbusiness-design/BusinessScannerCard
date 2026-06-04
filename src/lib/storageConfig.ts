@@ -1,55 +1,28 @@
-export type ContactStorageMode = "postgresql" | "firebase" | "indexeddb";
+export type ContactStorageMode = "indexeddb";
 
-const VALID: ContactStorageMode[] = ["postgresql", "firebase", "indexeddb"];
-
-/** Set after /api/storage/config (aligns Netlify build with Render CONTACT_STORAGE). */
 let resolvedStorageMode: ContactStorageMode | null = null;
 
 export function setResolvedStorageMode(mode: ContactStorageMode): void {
-  if (VALID.includes(mode)) {
-    resolvedStorageMode = mode;
-  }
+  resolvedStorageMode = mode;
 }
 
 export function getResolvedStorageMode(): ContactStorageMode | null {
   return resolvedStorageMode;
 }
 
-/** Vite build-time default (may differ from Render until resolveStorageMode runs). */
-export function getContactStorageMode(): ContactStorageMode {
-  const raw = String(import.meta.env.VITE_CONTACT_STORAGE || "indexeddb")
-    .trim()
-    .toLowerCase();
-  if (VALID.includes(raw as ContactStorageMode)) {
-    return raw as ContactStorageMode;
-  }
+export function resolveOfflineStorageMode(): ContactStorageMode {
   return "indexeddb";
 }
 
 export function getEffectiveStorageMode(): ContactStorageMode {
-  return resolvedStorageMode ?? getContactStorageMode();
+  return resolvedStorageMode ?? "indexeddb";
 }
 
 export function isIndexedDbStorage(): boolean {
-  return getEffectiveStorageMode() === "indexeddb";
+  return true;
 }
 
-export function isServerStorage(): boolean {
-  return getEffectiveStorageMode() !== "indexeddb";
-}
-
-/** User-facing storage name (online Contacts uses clearer labels for browser storage). */
-export function storageLabel(
-  mode: ContactStorageMode = getEffectiveStorageMode(),
-  options?: { online?: boolean },
-): string {
+export function storageLabel(options?: { online?: boolean }): string {
   const online = options?.online ?? false;
-  switch (mode) {
-    case "indexeddb":
-      return online ? "Saved on device" : "This device";
-    case "firebase":
-      return "Firebase";
-    default:
-      return "PostgreSQL";
-  }
+  return online ? "Zoho CRM" : "Offline queue (device)";
 }

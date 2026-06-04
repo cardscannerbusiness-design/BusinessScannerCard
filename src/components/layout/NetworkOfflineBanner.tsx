@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
-import { isNetworkOnline } from "@/lib/connectionMode";
 
 export function NetworkOfflineBanner() {
-  const [networkOnline, setNetworkOnline] = useState(isNetworkOnline);
+  // SSR and first client paint must match — sync navigator.onLine after mount only.
+  const [networkOnline, setNetworkOnline] = useState(true);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     const sync = () => setNetworkOnline(navigator.onLine);
 
     sync();

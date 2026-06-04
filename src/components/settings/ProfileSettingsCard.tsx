@@ -108,8 +108,8 @@ export function ProfileSettingsCard({
                 id="profile-fullName"
                 value={profile.fullName}
                 onChange={(e) => onChange("fullName", e.target.value)}
-                className="h-10 rounded-xl border-border/60 bg-background"
-                placeholder="Alex Kim"
+                className="h-10 rounded-md border-border/60 bg-background"
+                placeholder="Yogesh Vanaparti"
               />
             </Field>
             <Field id="profile-email" label="Email" icon={<Mail className="h-3.5 w-3.5" />}>
@@ -118,7 +118,7 @@ export function ProfileSettingsCard({
                 type="email"
                 value={profile.email}
                 onChange={(e) => onChange("email", e.target.value)}
-                className="h-10 rounded-xl border-border/60 bg-background"
+                className="h-10 rounded-md border-border/60 bg-background"
                 placeholder="you@company.com"
               />
             </Field>
@@ -133,7 +133,7 @@ export function ProfileSettingsCard({
                 type="tel"
                 value={profile.phone}
                 onChange={(e) => onChange("phone", e.target.value)}
-                className="h-10 rounded-xl border-border/60 bg-background"
+                className="h-10 rounded-md border-border/60 bg-background"
                 placeholder="+1 415 555 0142"
               />
             </Field>
@@ -153,7 +153,7 @@ export function ProfileSettingsCard({
                 id="profile-company"
                 value={profile.company}
                 onChange={(e) => onChange("company", e.target.value)}
-                className="h-10 rounded-xl border-border/60 bg-background"
+                className="h-10 rounded-md border-border/60 bg-background"
                 placeholder="Your organisation"
               />
             </Field>
@@ -162,7 +162,7 @@ export function ProfileSettingsCard({
                 id="profile-role"
                 value={profile.role}
                 onChange={(e) => onChange("role", e.target.value)}
-                className="h-10 rounded-xl border-border/60 bg-background"
+                className="h-10 rounded-md border-border/60 bg-background"
                 placeholder="Workspace owner"
               />
             </Field>
@@ -178,7 +178,7 @@ export function ProfileSettingsCard({
               >
                 <SelectTrigger
                   id="profile-timezone"
-                  className="h-10 w-full rounded-xl border-border/60 bg-background"
+                  className="h-10 w-full rounded-md border-border/60 bg-background"
                 >
                   <SelectValue placeholder="Select timezone" />
                 </SelectTrigger>

@@ -17,7 +17,7 @@ export const PAGE = {
       "Upload or photograph a business card. On-device OCR extracts contact details in seconds.",
   },
   contacts: {
-    title: "Contact directory",
+    title: "Contact Lists",
     description: "Search, filter, and manage every lead saved on this device.",
   },
   syncQueue: {

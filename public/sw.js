@@ -53,7 +53,6 @@ self.addEventListener('fetch', (event) => {
   if (
     requestUrl.pathname.startsWith('/api/') ||
     requestUrl.pathname.startsWith('/health') ||
-    requestUrl.pathname.startsWith('/scan-card') ||
     requestUrl.pathname.startsWith('/contacts') ||
     requestUrl.pathname.startsWith('/integrations') ||
     requestUrl.pathname.startsWith('/admin')

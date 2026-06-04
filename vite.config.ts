@@ -16,8 +16,18 @@ export default defineConfig({
   server: {
     proxy: {
       "/admin": { target: apiTarget, changeOrigin: true },
-      "/contacts": { target: apiTarget, changeOrigin: true },
-      "/scan-card": { target: apiTarget, changeOrigin: true },
+      // Proxy API paths only — do not steal SPA route GET /contacts (Contacts page)
+      "/contacts": {
+        target: apiTarget,
+        changeOrigin: true,
+        bypass(req) {
+          const path = (req.url ?? "").split("?")[0];
+          if (path !== "/contacts" && path !== "/contacts/") return;
+          const accept = req.headers.accept ?? "";
+          if (accept.includes("text/html")) return req.url;
+          if (req.headers["sec-fetch-mode"] === "navigate") return req.url;
+        },
+      },
       "/health": { target: apiTarget, changeOrigin: true },
       "/integrations": { target: apiTarget, changeOrigin: true },
       "/api": { target: apiTarget, changeOrigin: true },

@@ -11,8 +11,7 @@ import { NetworkOfflineBanner } from "@/components/layout/NetworkOfflineBanner";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmModalProvider } from "@/components/ui/confirm-modal";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
-import { getQueueItems } from "@/lib/indexeddb";
-import { syncAllQueueItemsToZoho } from "@/lib/contactStorage";
+import { countPendingZohoSync, maybeAutoSyncToZohoWhenOnline } from "@/lib/autoZohoSync";
 import { loadUserSettings } from "@/lib/settingsStorage";
 export function AppShell() {
   const { queryClient } = useRouteContext({ from: "__root__" });
@@ -39,37 +38,41 @@ export function AppShell() {
       }
     }
 
-    const processOfflineQueue = async () => {
+    const processAutoZohoSync = async () => {
       if (!navigator.onLine) return;
 
       const prefs = loadUserSettings();
-      if (!prefs.autoSyncQueueWhenOnline) return;
+      if (!prefs.autoSyncToZohoWhenOnline) return;
 
       try {
-        const queue = await getQueueItems();
-        const unsynced = queue.filter(
-          (item) => item.status === "pending" || item.status === "retrying",
-        );
-        if (unsynced.length === 0) return;
+        const pending = await countPendingZohoSync();
+        const totalPending = pending.queue + pending.contacts;
+        if (totalPending === 0) return;
 
         const showToast = prefs.notificationsEnabled && prefs.queueNotificationsEnabled;
         if (showToast) {
-          toast.info(`Saving ${unsynced.length} queued contact(s) on this device…`);
+          toast.info(`Syncing ${totalPending} contact(s) to Zoho CRM…`);
         }
-        const { synced, total } = await syncAllQueueItemsToZoho();
+
+        const summary = await maybeAutoSyncToZohoWhenOnline();
+        if (!summary.ran) return;
+
+        const synced = summary.queueSynced + summary.contactsSynced;
+        const total = summary.queueTotal + summary.contactsTotal;
         if (synced > 0 && showToast) {
-          toast.success(`Saved ${synced} of ${total} contact(s) on this device.`);
+          toast.success(`Synced ${synced} of ${total} contact(s) to Zoho CRM.`);
         }
+
         window.dispatchEvent(new CustomEvent("cs-contacts-updated"));
         window.dispatchEvent(new CustomEvent("cs-queue-updated"));
       } catch {
-        /* queue sync is best-effort */
+        /* auto-sync is best-effort */
       }
     };
 
     const handleOnline = () => {
       syncConnectionModeWithNetwork();
-      processOfflineQueue();
+      void processAutoZohoSync();
     };
     const handleOffline = () => {
       syncConnectionModeWithNetwork();
@@ -78,13 +81,13 @@ export function AppShell() {
     if (!navigator.onLine) {
       syncConnectionModeWithNetwork();
     } else {
-      processOfflineQueue();
+      void processAutoZohoSync();
     }
 
     const handleConnectionModeChange = (e: Event) => {
       const mode = (e as CustomEvent<"online" | "offline">).detail;
       if (mode === "online" && navigator.onLine) {
-        processOfflineQueue();
+        void processAutoZohoSync();
       }
     };
 

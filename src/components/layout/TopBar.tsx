@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { getQueueItems } from "@/lib/indexeddb";
 import { seedOfflineSampleContact } from "@/lib/contactStorage";
+import { isIndexedDbStorage } from "@/lib/storageConfig";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -57,18 +58,11 @@ export function TopBar() {
   };
 
   const ensureOfflineSample = async () => {
+    if (isIndexedDbStorage()) return;
     const result = await seedOfflineSampleContact();
     if (result.seeded) {
       window.dispatchEvent(new CustomEvent("cs-contacts-updated"));
     }
-  };
-
-  const goToContactsSearch = (value: string) => {
-    const q = value.trim();
-    void navigate({
-      to: "/contacts",
-      search: q ? { q } : {},
-    });
   };
 
   useEffect(() => {
@@ -113,17 +107,7 @@ export function TopBar() {
     <HeaderSearch
       className={className}
       placeholder={placeholder}
-      value={isContacts ? contactsQuery : undefined}
-      onChange={(value) => {
-        if (isContacts) {
-          void navigate({
-            to: "/contacts",
-            search: { q: value.trim() || undefined },
-            replace: true,
-          });
-        }
-      }}
-      onSubmit={goToContactsSearch}
+      urlQuery={isContacts ? contactsQuery : ""}
     />
   );
 

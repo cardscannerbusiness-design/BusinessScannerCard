@@ -13,6 +13,8 @@ export type UserSettings = {
   emailNotificationsEnabled: boolean;
   whatsappNotificationsEnabled: boolean;
   autoSyncQueueWhenOnline: boolean;
+  /** Sync queued + unsynced IndexedDB contacts to Zoho when internet returns. */
+  autoSyncToZohoWhenOnline: boolean;
   showCaptureTips: boolean;
   confirmBeforeDelete: boolean;
   preferOfflineCapture: boolean;
@@ -38,8 +40,8 @@ export const TIMEZONE_OPTIONS = [
 ] as const;
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
-  fullName: "Alex Kim",
-  email: "alex@cardsync.ai",
+  fullName: "Yogesh Vanaparti",
+  email: "yogesh@cardscannerbusiness.com",
   phone: "+1 415 555 0142",
   company: "CardSync AI",
   role: "Workspace owner",
@@ -47,11 +49,12 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   notificationsEnabled: true,
   queueNotificationsEnabled: true,
   captureNotificationsEnabled: true,
-  emailNotificationsEnabled: false,
+  emailNotificationsEnabled: true,
   whatsappNotificationsEnabled: false,
   cookiesAccepted: false,
   analyticsCookiesEnabled: false,
   autoSyncQueueWhenOnline: true,
+  autoSyncToZohoWhenOnline: true,
   showCaptureTips: true,
   confirmBeforeDelete: true,
   preferOfflineCapture: false,
@@ -66,7 +69,16 @@ export function loadUserSettings(): UserSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_USER_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<UserSettings>;
-    return { ...DEFAULT_USER_SETTINGS, ...parsed };
+    const autoSyncToZohoWhenOnline =
+      parsed.autoSyncToZohoWhenOnline ??
+      parsed.autoSyncQueueWhenOnline ??
+      DEFAULT_USER_SETTINGS.autoSyncToZohoWhenOnline;
+    return {
+      ...DEFAULT_USER_SETTINGS,
+      ...parsed,
+      autoSyncToZohoWhenOnline,
+      autoSyncQueueWhenOnline: autoSyncToZohoWhenOnline,
+    };
   } catch {
     return { ...DEFAULT_USER_SETTINGS };
   }
@@ -74,6 +86,12 @@ export function loadUserSettings(): UserSettings {
 
 export function saveUserSettings(settings: Partial<UserSettings>): UserSettings {
   const next = { ...loadUserSettings(), ...settings };
+  if (settings.autoSyncToZohoWhenOnline !== undefined) {
+    next.autoSyncQueueWhenOnline = settings.autoSyncToZohoWhenOnline;
+  }
+  if (settings.autoSyncQueueWhenOnline !== undefined && settings.autoSyncToZohoWhenOnline === undefined) {
+    next.autoSyncToZohoWhenOnline = settings.autoSyncQueueWhenOnline;
+  }
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent("cs-settings-updated", { detail: next }));
