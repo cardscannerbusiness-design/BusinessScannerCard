@@ -99,7 +99,10 @@ export function WhatsAppChatQrModal({
             ) : (
               <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
                 <li>Contact scans QR (or opens the link) on their phone.</li>
-                <li>WhatsApp opens with “{registration.prefill_text}” ready — they tap Send.</li>
+                <li>
+                  WhatsApp opens with “{registration.prefill_text}” ready — they must tap{" "}
+                  <strong>Send</strong> (not just open the chat).
+                </li>
                 <li>
                   {mode === "verify"
                     ? "CardSync confirms verification — Save Lead unlocks on this screen."

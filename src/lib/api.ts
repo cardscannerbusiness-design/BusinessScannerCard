@@ -20,12 +20,24 @@ function resolveDefaultApiUrl(): string {
   return "http://127.0.0.1:5000";
 }
 
+function isLocalApiUrl(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(url.trim());
+}
+
+function resolveDevApiBaseUrl(): string {
+  // Remote API (e.g. Render): call directly so verify + webhook use the same server.
+  if (configuredApiUrl && !isLocalApiUrl(configuredApiUrl)) {
+    return configuredApiUrl;
+  }
+  // Local Python: same-origin proxy via vite.config.ts
+  return "";
+}
+
 if (!configuredApiUrl && import.meta.env.DEV) {
   console.warn("VITE_API_URL is not set. Local dev uses Vite proxy to Python on port 5000.");
 }
 
-/** In dev (browser), use same origin so Vite proxies to Python on :5000 (avoids CORS). */
 export const API_BASE_URL =
   import.meta.env.DEV && typeof window !== "undefined"
-    ? ""
+    ? resolveDevApiBaseUrl()
     : resolveDefaultApiUrl();

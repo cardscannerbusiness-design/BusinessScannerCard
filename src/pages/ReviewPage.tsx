@@ -44,6 +44,7 @@ import { PhoneVerifyField } from "@/components/review/PhoneVerifyField";
 import { WhatsAppChatQrModal } from "@/components/review/WhatsAppChatQrModal";
 import { notifyOutreachAfterSync } from "@/lib/outreachFeedback";
 import { loadUserSettings } from "@/lib/settingsStorage";
+import { API_BASE_URL } from "@/lib/api";
 import {
   fetchWhatsAppVerifyStatus,
   startWhatsAppVerify,
@@ -106,6 +107,7 @@ export const ReviewPage = () => {
   const [verifyRegistration, setVerifyRegistration] =
     useState<WhatsAppChatReplyRegistration | null>(null);
   const verifyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const verifyPollAttemptsRef = useRef(0);
 
   const { success, error, info } = useToast();
   const upload = useUpload();
@@ -333,6 +335,7 @@ export const ReviewPage = () => {
 
     setPhoneVerifying(true);
     stopVerifyPolling();
+    verifyPollAttemptsRef.current = 0;
     try {
       const registration = await startWhatsAppVerify({
         ...buildPayload(),
@@ -344,6 +347,7 @@ export const ReviewPage = () => {
 
       verifyPollRef.current = setInterval(() => {
         void (async () => {
+          verifyPollAttemptsRef.current += 1;
           try {
             const status = await fetchWhatsAppVerifyStatus(phone);
             if (status.verified) {
@@ -352,9 +356,25 @@ export const ReviewPage = () => {
               setVerifiedForPhone(phone);
               setPhoneVerifying(false);
               success("WhatsApp verified — Save Lead is now enabled.");
+              return;
             }
-          } catch {
-            /* keep polling */
+            if (verifyPollAttemptsRef.current >= 60) {
+              stopVerifyPolling();
+              setPhoneVerifying(false);
+              error(
+                `Still waiting for WhatsApp. The phone in the form (${phone}) must match the device that scans the QR and taps Send. API: ${API_BASE_URL || "local proxy"}.`,
+              );
+            }
+          } catch (pollErr) {
+            if (verifyPollAttemptsRef.current >= 5) {
+              stopVerifyPolling();
+              setPhoneVerifying(false);
+              error(
+                pollErr instanceof Error
+                  ? pollErr.message
+                  : `Could not reach verify API (${API_BASE_URL || "local proxy"}).`,
+              );
+            }
           }
         })();
       }, 2000);
