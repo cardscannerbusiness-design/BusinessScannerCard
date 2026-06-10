@@ -19,6 +19,10 @@ export type ZohoSyncResult = {
   emailSkipped?: boolean;
   whatsappSent?: boolean;
   whatsappError?: string | null;
+  whatsappTo?: string | null;
+  whatsappMessageId?: string | null;
+  whatsappDeliveryStatus?: string | null;
+  whatsappSendMode?: string | null;
 };
 
 function normalizeZohoSyncResult(data: Record<string, unknown>): ZohoSyncResult {
@@ -44,6 +48,13 @@ function normalizeZohoSyncResult(data: Record<string, unknown>): ZohoSyncResult 
     emailSkipped: Boolean(data.email_skipped ?? data.emailSkipped),
     whatsappSent: Boolean(data.whatsapp_sent ?? data.whatsappSent),
     whatsappError: (data.whatsapp_error as string | null | undefined) ?? null,
+    whatsappTo: (data.whatsapp_to as string | null | undefined) ?? null,
+    whatsappMessageId:
+      (data.whatsapp_message_id as string | null | undefined) ?? null,
+    whatsappDeliveryStatus:
+      (data.whatsapp_delivery_status as string | null | undefined) ?? null,
+    whatsappSendMode:
+      (data.whatsapp_send_mode as string | null | undefined) ?? null,
   };
 }
 

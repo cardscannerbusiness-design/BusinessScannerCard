@@ -40,8 +40,15 @@ import {
   syncContactToZohoStorage,
 } from "@/lib/contactStorage";
 import { checkForDuplicates, type DuplicateMatch } from "@/lib/duplicateDetection";
+import { PhoneVerifyField } from "@/components/review/PhoneVerifyField";
+import { WhatsAppChatQrModal } from "@/components/review/WhatsAppChatQrModal";
 import { notifyOutreachAfterSync } from "@/lib/outreachFeedback";
 import { loadUserSettings } from "@/lib/settingsStorage";
+import {
+  fetchWhatsAppVerifyStatus,
+  startWhatsAppVerify,
+  type WhatsAppChatReplyRegistration,
+} from "@/lib/whatsappChatLink";
 import { parseScanContact } from "@/lib/scanResult";
 import { scanFileAndStore } from "@/lib/scanPipeline";
 import { loadScanSession, readFileAsDataUrl, dataUrlToFile, isEmptyScanContact } from "@/lib/scanSession";
@@ -92,6 +99,13 @@ export const ReviewPage = () => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [ocrWarning, setOcrWarning] = useState<string | null>(null);
   const [showAdvancedFields, setShowAdvancedFields] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [verifiedForPhone, setVerifiedForPhone] = useState("");
+  const [phoneVerifying, setPhoneVerifying] = useState(false);
+  const [verifyQrOpen, setVerifyQrOpen] = useState(false);
+  const [verifyRegistration, setVerifyRegistration] =
+    useState<WhatsAppChatReplyRegistration | null>(null);
+  const verifyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { success, error, info } = useToast();
   const upload = useUpload();
@@ -154,8 +168,23 @@ export const ReviewPage = () => {
     setOcrWarning(meta?.ocrWarning ?? null);
   }, [applyScanData]);
 
+  const stopVerifyPolling = () => {
+    if (verifyPollRef.current) {
+      clearInterval(verifyPollRef.current);
+      verifyPollRef.current = null;
+    }
+  };
+
+  useEffect(() => () => stopVerifyPolling(), []);
+
   const handleFormChange = (name: string, value: string) => {
     form.setValue(name, value);
+    if (name === "phoneNumber" && value.trim() !== verifiedForPhone) {
+      setPhoneVerified(false);
+      setVerifiedForPhone("");
+      stopVerifyPolling();
+      setPhoneVerifying(false);
+    }
     if (name === "firstName" || name === "lastName") {
       const first = name === "firstName" ? value : form.values.firstName;
       const last = name === "lastName" ? value : form.values.lastName;
@@ -163,6 +192,20 @@ export const ReviewPage = () => {
       if (combined) form.setValue("fullName", combined);
     }
   };
+
+  const settings = loadUserSettings();
+  const primaryPhone = form.values.phoneNumber.trim();
+  const whatsappVerifyRequired =
+    settings.whatsappNotificationsEnabled &&
+    typeof navigator !== "undefined" &&
+    navigator.onLine &&
+    !isOfflineMode();
+  const saveBlockedByVerify = whatsappVerifyRequired && Boolean(primaryPhone) && !phoneVerified;
+  const saveHint = saveBlockedByVerify
+    ? "Verify the phone on WhatsApp first (tap Verify → contact scans QR on their phone)."
+    : whatsappVerifyRequired && !primaryPhone
+      ? "Add a phone number, then verify on WhatsApp before saving."
+      : undefined;
 
   const resolvedFullName =
     form.values.fullName.trim() ||
@@ -272,6 +315,59 @@ export const ReviewPage = () => {
     gstNumber: form.values.gstNumber,
   });
 
+  const finishAfterSave = () => {
+    sessionStorage.removeItem("latestScanResult");
+    navigate({ to: "/contacts" });
+  };
+
+  const startPhoneVerify = async () => {
+    const phone = form.values.phoneNumber.trim();
+    if (!phone) {
+      error("Enter a phone number before verifying.");
+      return;
+    }
+    if (!navigator.onLine) {
+      error("Go online to verify WhatsApp.");
+      return;
+    }
+
+    setPhoneVerifying(true);
+    stopVerifyPolling();
+    try {
+      const registration = await startWhatsAppVerify({
+        ...buildPayload(),
+        phone,
+      });
+      setVerifyRegistration(registration);
+      setVerifyQrOpen(true);
+      info("Ask the contact to scan the QR on their phone and tap Send in WhatsApp.");
+
+      verifyPollRef.current = setInterval(() => {
+        void (async () => {
+          try {
+            const status = await fetchWhatsAppVerifyStatus(phone);
+            if (status.verified) {
+              stopVerifyPolling();
+              setPhoneVerified(true);
+              setVerifiedForPhone(phone);
+              setPhoneVerifying(false);
+              success("WhatsApp verified — Save Lead is now enabled.");
+            }
+          } catch {
+            /* keep polling */
+          }
+        })();
+      }, 2000);
+    } catch (err) {
+      setPhoneVerifying(false);
+      error(err instanceof Error ? err.message : "Could not start WhatsApp verify.");
+    }
+  };
+
+  const outreachSkipWhatsApp = (settingsSnapshot = loadUserSettings()) =>
+    !settingsSnapshot.whatsappNotificationsEnabled ||
+    (whatsappVerifyRequired && !phoneVerified);
+
   const persistContact = async (
     payload: LeadPayload,
     imageFile: File | null,
@@ -299,20 +395,21 @@ export const ReviewPage = () => {
         await updateContact(existingId, updatePayload);
 
         if (!isOfflineMode() && navigator.onLine) {
-          const settings = loadUserSettings();
+          const settingsSnapshot = loadUserSettings();
+          const skip = {
+            skipWhatsApp: outreachSkipWhatsApp(settingsSnapshot),
+            skipEmail:
+              !settingsSnapshot.emailNotificationsEnabled ||
+              !pickPrimaryEmail(updatePayload),
+          };
           try {
             const zohoResult = await syncContactToZohoStorage(
               existingId,
-              {
-                skipWhatsApp: !settings.whatsappNotificationsEnabled,
-                skipEmail:
-                  !settings.emailNotificationsEnabled ||
-                  !pickPrimaryEmail(updatePayload),
-              },
+              skip,
               updatePayload,
             );
             if (zohoResult.zohoLeadId) {
-              notifyOutreachAfterSync(settings, zohoResult);
+              notifyOutreachAfterSync(settingsSnapshot, zohoResult);
             }
           } catch (zohoErr: unknown) {
             const msg =
@@ -321,12 +418,13 @@ export const ReviewPage = () => {
           }
         }
       } else {
-        const settings = loadUserSettings();
+        const settingsSnapshot = loadUserSettings();
         const online = typeof navigator !== "undefined" && navigator.onLine;
         const saved = await saveContact(payload, imageDataUrl, {
           connectionMode: online ? "online" : "offline",
-          skipWhatsApp: !settings.whatsappNotificationsEnabled,
-          skipEmail: !settings.emailNotificationsEnabled || !pickPrimaryEmail(payload),
+          skipWhatsApp: outreachSkipWhatsApp(settingsSnapshot),
+          skipEmail:
+            !settingsSnapshot.emailNotificationsEnabled || !pickPrimaryEmail(payload),
         });
         contactId = saved.id;
 
@@ -346,33 +444,34 @@ export const ReviewPage = () => {
             error(`Zoho sync failed: ${saved.zohoError}. Use Sync to Zoho on Contacts.`);
           } else if (saved.alreadySynced) {
             success("Saved — contact is already in Zoho CRM.");
-            notifyOutreachAfterSync(settings, saved);
+            notifyOutreachAfterSync(settingsSnapshot, saved);
           } else {
             success("Saved and synced to Zoho CRM.");
-            notifyOutreachAfterSync(settings, saved);
+            notifyOutreachAfterSync(settingsSnapshot, saved);
           }
         } else if (saved.queued) {
           info("Zoho sync failed — contact queued on device. Retry when online.");
         } else {
           success(`Saved to ${label}. Sync to Zoho from Contacts when online.`);
         }
+
       }
 
       if (existingId) {
         success(`Contact updated in ${label}.`);
       }
 
-      sessionStorage.removeItem("latestScanResult");
-      navigate({ to: "/contacts" });
+      finishAfterSave();
       return;
     }
 
-    const settings = loadUserSettings();
+    const settingsSnapshot = loadUserSettings();
     const online = typeof navigator !== "undefined" && navigator.onLine;
     const saved = await saveContact(payload, imageDataUrl, {
       connectionMode: online ? "online" : "offline",
-      skipWhatsApp: !settings.whatsappNotificationsEnabled,
-      skipEmail: !settings.emailNotificationsEnabled || !pickPrimaryEmail(payload),
+      skipWhatsApp: outreachSkipWhatsApp(settingsSnapshot),
+      skipEmail:
+        !settingsSnapshot.emailNotificationsEnabled || !pickPrimaryEmail(payload),
     });
     info("Saved to browser queue. Will sync when storage is available.");
     sessionStorage.removeItem("latestScanResult");
@@ -409,6 +508,11 @@ export const ReviewPage = () => {
   };
 
   const saveLead = async () => {
+    if (saveBlockedByVerify) {
+      error("Verify the phone on WhatsApp before saving.");
+      return;
+    }
+
     const fullName = resolvedFullName;
     if (!fullName) {
       error("Please enter a name before saving.");
@@ -607,13 +711,27 @@ export const ReviewPage = () => {
                       key={field.name}
                       className={field.component === "TextAreaInput" ? "md:col-span-2" : ""}
                     >
-                      <FieldRenderer
-                        field={field}
-                        value={form.values[field.name] || ""}
-                        error={form.errors[field.name]}
-                        confidence={field.confidenceKey ? confidence[field.confidenceKey] : undefined}
-                        onChange={handleFormChange}
-                      />
+                      {field.name === "phoneNumber" && whatsappVerifyRequired ? (
+                        <PhoneVerifyField
+                          value={form.values.phoneNumber || ""}
+                          error={form.errors.phoneNumber}
+                          confidence={confidence.phoneNumber}
+                          verified={phoneVerified}
+                          verifying={phoneVerifying}
+                          onChange={(next) => handleFormChange("phoneNumber", next)}
+                          onVerify={startPhoneVerify}
+                        />
+                      ) : (
+                        <FieldRenderer
+                          field={field}
+                          value={form.values[field.name] || ""}
+                          error={form.errors[field.name]}
+                          confidence={
+                            field.confidenceKey ? confidence[field.confidenceKey] : undefined
+                          }
+                          onChange={handleFormChange}
+                        />
+                      )}
                     </FormRow>
                   ))}
                 </FormGrid>
@@ -625,11 +743,14 @@ export const ReviewPage = () => {
             </p>
             <FormActions
               onReset={() => {
+                stopVerifyPolling();
                 sessionStorage.removeItem("latestScanResult");
                 navigate({ to: "/scan" });
               }}
               onSave={saveLead}
               saving={isSaving}
+              saveDisabled={saveBlockedByVerify}
+              saveHint={saveHint}
             />
           </Card>
         }
@@ -649,6 +770,28 @@ export const ReviewPage = () => {
         match={duplicateMatch}
         incoming={pendingPayloadRef.current || buildPayload()}
         onResolve={executeSave}
+      />
+
+      <WhatsAppChatQrModal
+        open={verifyQrOpen}
+        registration={verifyRegistration}
+        contactName={resolvedFullName}
+        mode="verify"
+        verified={phoneVerified}
+        onClose={() => {
+          setVerifyQrOpen(false);
+          if (phoneVerified) {
+            setVerifyRegistration(null);
+          }
+          if (!phoneVerified) {
+            setPhoneVerifying(false);
+            stopVerifyPolling();
+          }
+        }}
+        onCopyLink={(url) => {
+          if (url) success("WhatsApp link copied.");
+          else error("Could not copy link.");
+        }}
       />
     </PageContainer>
   );

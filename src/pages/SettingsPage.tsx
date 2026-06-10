@@ -246,17 +246,27 @@ export function SettingsPage() {
             />
             <SettingRow
               icon={<MessageCircle className="h-4 w-4" />}
-              title="WhatsApp follow-ups"
-              description="Remind you to message contacts on WhatsApp (when available)"
+              title="Auto thank-you on WhatsApp"
+              description="Send an approved template to the contact's phone when you save or sync (requires a phone on the card)"
               checked={profile.whatsappNotificationsEnabled}
               onCheckedChange={(v) =>
                 persistToggle(
                   "whatsappNotificationsEnabled",
                   v,
-                  v ? "WhatsApp reminders on." : "WhatsApp reminders off.",
+                  v ? "WhatsApp auto-send on." : "WhatsApp auto-send off.",
                 )
               }
             />
+            {profile.whatsappNotificationsEnabled ? (
+              <p className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+                Messages are sent from{" "}
+                <span className="font-medium text-foreground">BusinessCardScanner</span> (+91 74483
+                64850). Recipients often see the first message under{" "}
+                <span className="font-medium text-foreground">WhatsApp → Updates</span>, not Chats.
+                Confirm delivery in Meta WhatsApp Manager → Message logs if it is missing on the
+                phone.
+              </p>
+            ) : null}
           </div>
         </Card>
 

@@ -83,6 +83,12 @@ type ZohoSaveFields = {
   emailError?: string | null;
   emailTo?: string | null;
   emailExtracted?: string | null;
+  whatsappSent?: boolean;
+  whatsappError?: string | null;
+  whatsappTo?: string | null;
+  whatsappMessageId?: string | null;
+  whatsappDeliveryStatus?: string | null;
+  whatsappSendMode?: string | null;
 };
 
 async function saveOfflineToIndexedDbQueue(
@@ -143,6 +149,12 @@ async function saveOnlineDirectToZoho(
       emailError: zoho.emailError,
       emailTo: zoho.emailTo,
       emailExtracted: zoho.emailExtracted || email || null,
+      whatsappSent: zoho.whatsappSent,
+      whatsappError: zoho.whatsappError,
+      whatsappTo: zoho.whatsappTo,
+      whatsappMessageId: zoho.whatsappMessageId,
+      whatsappDeliveryStatus: zoho.whatsappDeliveryStatus,
+      whatsappSendMode: zoho.whatsappSendMode,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Zoho sync failed";

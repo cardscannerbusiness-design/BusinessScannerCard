@@ -94,6 +94,12 @@ export type SaveContactResult = {
   emailError?: string | null;
   emailTo?: string | null;
   emailExtracted?: string | null;
+  whatsappSent?: boolean;
+  whatsappError?: string | null;
+  whatsappTo?: string | null;
+  whatsappMessageId?: string | null;
+  whatsappDeliveryStatus?: string | null;
+  whatsappSendMode?: string | null;
 };
 
 export async function saveContactToLocalDb(
@@ -114,6 +120,12 @@ export async function saveContactToLocalDb(
     email_error?: string | null;
     email_to?: string | null;
     email_extracted?: string | null;
+    whatsapp_sent?: boolean;
+    whatsapp_error?: string | null;
+    whatsapp_to?: string | null;
+    whatsapp_message_id?: string | null;
+    whatsapp_delivery_status?: string | null;
+    whatsapp_send_mode?: string | null;
   };
   if (!response.ok) {
     throw new Error(
@@ -133,6 +145,13 @@ export async function saveContactToLocalDb(
     emailError: data.email_error ?? data.emailError ?? null,
     emailTo: data.email_to ?? data.emailTo ?? null,
     emailExtracted: data.email_extracted ?? data.emailExtracted ?? null,
+    whatsappSent: Boolean(data.whatsapp_sent ?? data.whatsappSent),
+    whatsappError: data.whatsapp_error ?? data.whatsappError ?? null,
+    whatsappTo: data.whatsapp_to ?? data.whatsappTo ?? null,
+    whatsappMessageId: data.whatsapp_message_id ?? data.whatsappMessageId ?? null,
+    whatsappDeliveryStatus:
+      data.whatsapp_delivery_status ?? data.whatsappDeliveryStatus ?? null,
+    whatsappSendMode: data.whatsapp_send_mode ?? data.whatsappSendMode ?? null,
   };
 }
 

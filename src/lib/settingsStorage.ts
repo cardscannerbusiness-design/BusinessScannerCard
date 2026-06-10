@@ -26,6 +26,8 @@ export type UserSettings = {
 };
 
 const STORAGE_KEY = "cs-user-settings";
+/** One-time migration: enable WhatsApp follow-ups for existing installs. */
+const WHATSAPP_ENABLE_MIGRATION_KEY = "cs-whatsapp-enabled-v3";
 
 export const TIMEZONE_OPTIONS = [
   "Pacific Time (US)",
@@ -50,7 +52,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   queueNotificationsEnabled: true,
   captureNotificationsEnabled: true,
   emailNotificationsEnabled: true,
-  whatsappNotificationsEnabled: false,
+  whatsappNotificationsEnabled: true,
   cookiesAccepted: false,
   analyticsCookiesEnabled: false,
   autoSyncQueueWhenOnline: true,
@@ -73,12 +75,27 @@ export function loadUserSettings(): UserSettings {
       parsed.autoSyncToZohoWhenOnline ??
       parsed.autoSyncQueueWhenOnline ??
       DEFAULT_USER_SETTINGS.autoSyncToZohoWhenOnline;
-    return {
+
+    const needsWhatsappMigration = !localStorage.getItem(WHATSAPP_ENABLE_MIGRATION_KEY);
+    const whatsappNotificationsEnabled = needsWhatsappMigration
+      ? true
+      : parsed.whatsappNotificationsEnabled !== false;
+
+    if (needsWhatsappMigration) {
+      localStorage.setItem(WHATSAPP_ENABLE_MIGRATION_KEY, "1");
+    }
+
+    const merged = {
       ...DEFAULT_USER_SETTINGS,
       ...parsed,
       autoSyncToZohoWhenOnline,
       autoSyncQueueWhenOnline: autoSyncToZohoWhenOnline,
+      whatsappNotificationsEnabled,
     };
+    if (needsWhatsappMigration) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    }
+    return merged;
   } catch {
     return { ...DEFAULT_USER_SETTINGS };
   }
