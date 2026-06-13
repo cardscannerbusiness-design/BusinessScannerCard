@@ -30,7 +30,7 @@ import {
   type DuplicateAction,
 } from "@/components/review/DuplicateResolutionModal";
 import { buildContactBody, resolveCardImageFile, type LeadPayload } from "@/lib/cardImage";
-import { isOfflineMode } from "@/lib/connectionMode";
+import { isOfflineMode, getConnectionMode, syncConnectionModeWithNetwork, CONNECTION_MODE_CHANGED } from "@/lib/connectionMode";
 import { pickPrimaryEmail } from "@/lib/contactEmail";
 import {
   checkStorageHealth,
@@ -79,6 +79,8 @@ const emptyPickers = (): PickerState => ({
 export const ReviewPage = () => {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
+  const eventInputRef = useRef<HTMLInputElement>(null);
+  const eventNameRef = useRef("");
   const pendingPayloadRef = useRef<LeadPayload | null>(null);
   const pendingImageRef = useRef<File | null>(null);
   const autoExtractedRef = useRef(false);
@@ -96,6 +98,9 @@ export const ReviewPage = () => {
   const [showAdvancedFields, setShowAdvancedFields] = useState(false);
   const [eventName, setEventName] = useState(() => getLastUsedEventName() || "");
   const [eventError, setEventError] = useState<string | null>(null);
+  const [connectionMode, setConnectionMode] = useState<"online" | "offline">(() =>
+    typeof window !== "undefined" ? getConnectionMode() : "online",
+  );
   const { success, error, info } = useToast();
   const upload = useUpload();
   const form = useForm(leadFields, initialValues);
@@ -212,6 +217,10 @@ export const ReviewPage = () => {
   const [scanRevision, setScanRevision] = useState(0);
 
   useEffect(() => {
+    eventNameRef.current = eventName ?? "";
+  }, [eventName]);
+
+  useEffect(() => {
     loadFromSession();
     const onScanUpdated = () => {
       loadFromSession();
@@ -220,6 +229,32 @@ export const ReviewPage = () => {
     window.addEventListener("cs-scan-updated", onScanUpdated);
     return () => window.removeEventListener("cs-scan-updated", onScanUpdated);
   }, [loadFromSession]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const refreshMode = () => setConnectionMode(getConnectionMode());
+    syncConnectionModeWithNetwork();
+    refreshMode();
+
+    window.addEventListener("online", refreshMode);
+    window.addEventListener("offline", refreshMode);
+    window.addEventListener(CONNECTION_MODE_CHANGED, refreshMode);
+    return () => {
+      window.removeEventListener("online", refreshMode);
+      window.removeEventListener("offline", refreshMode);
+      window.removeEventListener(CONNECTION_MODE_CHANGED, refreshMode);
+    };
+  }, []);
+
+  const readEventName = () => {
+    const fromInput = eventInputRef.current?.value?.trim();
+    if (fromInput) {
+      eventNameRef.current = fromInput;
+      return fromInput;
+    }
+    return (eventNameRef.current || eventName || "").trim();
+  };
 
   const updatePicker = (key: keyof PickerState, items: PickerItem[]) => {
     const next = { ...pickers, [key]: items };
@@ -269,8 +304,8 @@ export const ReviewPage = () => {
     })();
   }, [scanRevision, isExtracting]);
 
-  const buildPayload = (): LeadPayload => {
-    const trimmedEvent = (eventName ?? "").trim();
+  const buildPayload = (eventOverride?: string): LeadPayload => {
+    const trimmedEvent = (eventOverride ?? readEventName()).trim();
     const existingEvent = loadEvents().find(
       (event) => event.name.toLowerCase() === trimmedEvent.toLowerCase(),
     );
@@ -357,9 +392,9 @@ export const ReviewPage = () => {
         }
       } else {
         const settingsSnapshot = loadUserSettings();
-        const online = typeof navigator !== "undefined" && navigator.onLine;
+        const mode = getConnectionMode();
         const saved = await saveContact(payload, imageDataUrl, {
-          connectionMode: online ? "online" : "offline",
+          connectionMode: mode,
           skipWhatsApp: outreachSkipWhatsApp(settingsSnapshot),
           skipEmail:
             !settingsSnapshot.emailNotificationsEnabled || !pickPrimaryEmail(payload),
@@ -404,9 +439,9 @@ export const ReviewPage = () => {
     }
 
     const settingsSnapshot = loadUserSettings();
-    const online = typeof navigator !== "undefined" && navigator.onLine;
+    const mode = getConnectionMode();
     const saved = await saveContact(payload, imageDataUrl, {
-      connectionMode: online ? "online" : "offline",
+      connectionMode: mode,
       skipWhatsApp: outreachSkipWhatsApp(settingsSnapshot),
       skipEmail:
         !settingsSnapshot.emailNotificationsEnabled || !pickPrimaryEmail(payload),
@@ -423,7 +458,8 @@ export const ReviewPage = () => {
       return;
     }
 
-    const payload = pendingPayloadRef.current || buildPayload();
+    const payload = buildPayload();
+    pendingPayloadRef.current = payload;
     const imageFile = pendingImageRef.current;
 
     setIsSaving(true);
@@ -452,7 +488,8 @@ export const ReviewPage = () => {
       return;
     }
 
-    if (!(eventName ?? "").trim()) {
+    const trimmedEvent = readEventName();
+    if (!trimmedEvent) {
       setEventError("Select or enter an event name before saving.");
       error("Please select or enter an event name before saving.");
       return;
@@ -468,14 +505,22 @@ export const ReviewPage = () => {
       form.setValue("fullName", fullName);
     }
 
-    const savedEvent = resolveEventForSave((eventName ?? "").trim());
+    const savedEvent = resolveEventForSave(trimmedEvent);
     setEventName(savedEvent.name);
+    eventNameRef.current = savedEvent.name;
 
-    const payload = {
-      ...buildPayload(),
-      eventName: savedEvent.name,
-      eventId: savedEvent.id,
-    };
+    const payload = buildPayload(savedEvent.name);
+    const mode = getConnectionMode();
+
+    console.info("[Review save]", {
+      eventNameInput: eventInputRef.current?.value,
+      eventNameState: eventName,
+      eventNameResolved: savedEvent.name,
+      connectionMode: mode,
+      navigatorOnLine: typeof navigator !== "undefined" ? navigator.onLine : null,
+      payloadEventName: payload.eventName,
+    });
+
     const imageFile = await resolveCardImageFile(upload.file, upload.previewUrl, savedScanImage);
     pendingPayloadRef.current = payload;
     pendingImageRef.current = imageFile;
@@ -582,10 +627,13 @@ export const ReviewPage = () => {
               <OCRPreview values={form.values} />
               <div className="mt-5 border-t border-border/60 pt-5">
                 <EventNameCombobox
+                  ref={eventInputRef}
                   value={eventName ?? ""}
                   onChange={(next) => {
-                    setEventName(next ?? "");
-                    if ((next ?? "").trim()) setEventError(null);
+                    const value = next ?? "";
+                    eventNameRef.current = value;
+                    setEventName(value);
+                    if (value.trim()) setEventError(null);
                   }}
                   error={eventError || undefined}
                 />
@@ -683,8 +731,20 @@ export const ReviewPage = () => {
               </FormSection>
             ))}
 
+            <div className="mb-5 rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+              Mode:{" "}
+              <span className="font-medium text-foreground">
+                {connectionMode === "online" ? "Online — syncs to Zoho on save" : "Offline — saves to device queue"}
+              </span>
+              {connectionMode === "offline" && typeof navigator !== "undefined" && navigator.onLine ? (
+                <span className="mt-1 block text-amber-700 dark:text-amber-300">
+                  Browser is online but app is in offline mode. Turn off &quot;Prefer offline capture&quot; in Settings to sync events to Zoho immediately.
+                </span>
+              ) : null}
+            </div>
+
             <p className="mb-3 mt-4 text-xs text-muted-foreground">
-              Save flow: **local PostgreSQL** on your PC → manual **Zoho** sync from Contacts. If local DB is off, cards go to the browser queue.
+              Save syncs to Zoho CRM when online. Event name is required and stored in Zoho Features.
             </p>
             <FormActions
               onReset={() => {

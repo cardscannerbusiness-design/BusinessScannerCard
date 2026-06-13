@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { forwardRef, useId } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { listEventNames, getExampleEventName } from "@/lib/eventStorage";
@@ -10,12 +10,11 @@ type EventNameComboboxProps = {
   disabled?: boolean;
 };
 
-export function EventNameCombobox({
-  value,
-  onChange,
-  error,
-  disabled = false,
-}: EventNameComboboxProps) {
+export const EventNameCombobox = forwardRef<HTMLInputElement, EventNameComboboxProps>(
+  function EventNameCombobox(
+    { value, onChange, error, disabled = false },
+    ref,
+  ) {
   const listId = useId();
   const eventNames = listEventNames();
 
@@ -25,9 +24,11 @@ export function EventNameCombobox({
         Event name <span className="text-destructive">*</span>
       </label>
       <Input
+        ref={ref}
         id={listId}
+        name="eventName"
         type="text"
-        list={`${listId}-events`}
+        list={eventNames.length > 0 ? `${listId}-events` : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={`Type event name (e.g. ${getExampleEventName()})`}
@@ -51,4 +52,5 @@ export function EventNameCombobox({
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );
-}
+  },
+);

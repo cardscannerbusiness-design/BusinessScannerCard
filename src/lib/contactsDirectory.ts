@@ -2,6 +2,7 @@ import { getConnectionMode } from "@/lib/connectionMode";
 import { buildZohoLeadLookup, isDuplicateOfZohoLead } from "@/lib/contactListMerge";
 import { getZohoLeadsUrl } from "@/lib/backendTargets";
 import { listContacts, storageLabel } from "@/lib/contactStorage";
+import { resolveEventNameForContact } from "@/lib/eventStorage";
 import { getQueueItems } from "@/lib/indexeddb";
 import type { ContactStatus } from "@/lib/contactStatus";
 
@@ -154,7 +155,12 @@ async function fetchContactsDirectoryFromSources(): Promise<ContactsDirectorySna
       title: String(c.title || c.designation || ""),
       email: String(c.email || ""),
       phone: String(c.phone || ""),
-      eventName: String(c.eventName || ""),
+      eventName: resolveEventNameForContact({
+        eventName: String(c.eventName || ""),
+        zohoLeadId: c.id ? String(c.id) : null,
+        email: String(c.email || ""),
+        phone: String(c.phone || ""),
+      }),
       source: "zoho" as const,
       initials,
       accent: String(c.accent || ACCENTS[i % ACCENTS.length]),
@@ -192,7 +198,11 @@ async function fetchContactsDirectoryFromSources(): Promise<ContactsDirectorySna
           title: c.title || c.designation || "No Title",
           email: c.email || "",
           phone: c.phone || "",
-          eventName: String(c.eventName || ""),
+          eventName: resolveEventNameForContact({
+            eventName: String(c.eventName || ""),
+            email: String(c.email || ""),
+            phone: String(c.phone || ""),
+          }),
           status: (item.status === "retrying" ? "pending" : item.status) as ContactStatus,
           channels: c.channels || {
             whatsapp: !!c.phone,
@@ -246,7 +256,12 @@ async function fetchContactsDirectoryFromSources(): Promise<ContactsDirectorySna
         title: String(c.title || c.designation || ""),
         email: String(c.email || ""),
         phone: String(c.phone || ""),
-        eventName: String(c.eventName || ""),
+        eventName: resolveEventNameForContact({
+          eventName: String(c.eventName || ""),
+          zohoLeadId: (c.zohoLeadId as string | null) || null,
+          email: String(c.email || ""),
+          phone: String(c.phone || ""),
+        }),
         source: storageSource,
         zohoLeadId: (c.zohoLeadId as string | null) || null,
         initials,

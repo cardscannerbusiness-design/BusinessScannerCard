@@ -23,6 +23,8 @@ import {
   queueContactToPayload,
   type LocalContact,
 } from "@/lib/localContactApi";
+import { recordContactEventLink } from "@/lib/eventStorage";
+import { getConnectionMode } from "@/lib/connectionMode";
 import { syncPayloadToZoho, seedOfflineSampleContact } from "@/lib/contactApi";
 
 export type StoredContact = Awaited<ReturnType<typeof listStoredContacts>>[number];
@@ -64,7 +66,7 @@ function isOfflineSave(options?: { connectionMode?: "online" | "offline" }): boo
 }
 
 function saveConnectionMode(): "online" | "offline" {
-  return typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline";
+  return getConnectionMode();
 }
 
 function notifyContactsListChanged(): void {
@@ -129,6 +131,14 @@ async function saveOnlineDirectToZoho(
       skipWhatsApp: options?.skipWhatsApp,
       skipEmail,
     });
+    if (body.eventName?.trim()) {
+      recordContactEventLink({
+        eventName: body.eventName.trim(),
+        zohoLeadId: zoho.zohoLeadId,
+        email,
+        phone: body.phone,
+      });
+    }
     const { recordDirectZohoCapture } = await import("@/lib/captureSourceAnalytics");
     recordDirectZohoCapture();
     notifyContactsListChanged();
@@ -174,6 +184,14 @@ export async function syncQueueItemToZoho(
     skipWhatsApp: options?.skipWhatsApp,
     skipEmail: options?.skipEmail,
   });
+  if (payload.eventName?.trim()) {
+    recordContactEventLink({
+      eventName: payload.eventName.trim(),
+      zohoLeadId: result.zohoLeadId,
+      email: pickPrimaryEmail(payload),
+      phone: payload.phone,
+    });
+  }
   await removeQueueItem(item.id);
   const { recordQueueSyncedToZoho } = await import("@/lib/captureSourceAnalytics");
   recordQueueSyncedToZoho();
@@ -298,16 +316,27 @@ export async function syncContactToZohoStorage(
   }
 
   const email = pickPrimaryEmail(payload);
+  const zohoLeadId =
+    (payload as LeadPayload & { zohoLeadId?: string | null }).zohoLeadId ??
+    (contact?.zohoLeadId ? String(contact.zohoLeadId) : undefined);
+
   const result = await syncPayloadToZoho(
     {
       ...payload,
       email,
-      zohoLeadId:
-        (payload as LeadPayload & { zohoLeadId?: string | null }).zohoLeadId ??
-        contactId,
+      ...(zohoLeadId ? { zohoLeadId } : {}),
     },
     { connectionMode: "online", ...options },
   );
+
+  if (payload.eventName?.trim()) {
+    recordContactEventLink({
+      eventName: payload.eventName.trim(),
+      zohoLeadId: result.zohoLeadId,
+      email,
+      phone: payload.phone,
+    });
+  }
 
   if (contact && result.zohoLeadId) {
     await markContactSyncedZoho(contactId, result.zohoLeadId);

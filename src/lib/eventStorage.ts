@@ -125,3 +125,92 @@ export function purgeOrphanExampleEvent(contacts: { eventName?: string }[]): voi
     setLastUsedEventName("");
   }
 }
+
+const EVENT_LEAD_MAP_KEY = "cs-event-lead-map";
+
+type EventLeadLink = {
+  eventName: string;
+  updatedAt: string;
+};
+
+type EventLeadMap = {
+  byZohoId: Record<string, EventLeadLink>;
+  byContactKey: Record<string, EventLeadLink>;
+};
+
+function eventContactKey(email?: string, phone?: string): string {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (normalizedEmail) return `e:${normalizedEmail}`;
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (digits.length >= 7) return `p:${digits}`;
+  return "";
+}
+
+function readEventLeadMap(): EventLeadMap {
+  if (typeof window === "undefined") {
+    return { byZohoId: {}, byContactKey: {} };
+  }
+  try {
+    const raw = localStorage.getItem(EVENT_LEAD_MAP_KEY);
+    if (!raw) return { byZohoId: {}, byContactKey: {} };
+    const parsed = JSON.parse(raw) as Partial<EventLeadMap>;
+    return {
+      byZohoId: parsed.byZohoId && typeof parsed.byZohoId === "object" ? parsed.byZohoId : {},
+      byContactKey:
+        parsed.byContactKey && typeof parsed.byContactKey === "object"
+          ? parsed.byContactKey
+          : {},
+    };
+  } catch {
+    return { byZohoId: {}, byContactKey: {} };
+  }
+}
+
+function writeEventLeadMap(map: EventLeadMap): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(EVENT_LEAD_MAP_KEY, JSON.stringify(map));
+}
+
+/** Remember which event a lead belongs to (survives Zoho lag / empty Features column). */
+export function recordContactEventLink(meta: {
+  eventName: string;
+  zohoLeadId?: string | null;
+  email?: string;
+  phone?: string;
+}): void {
+  const eventName = meta.eventName.trim();
+  if (!eventName) return;
+
+  const link: EventLeadLink = { eventName, updatedAt: new Date().toISOString() };
+  const map = readEventLeadMap();
+  const zohoId = String(meta.zohoLeadId || "").trim();
+  if (zohoId) {
+    map.byZohoId[zohoId] = link;
+  }
+  const key = eventContactKey(meta.email, meta.phone);
+  if (key) {
+    map.byContactKey[key] = link;
+  }
+  writeEventLeadMap(map);
+}
+
+export function resolveEventNameForContact(contact: {
+  eventName?: string;
+  zohoLeadId?: string | null;
+  email?: string;
+  phone?: string;
+}): string {
+  const direct = String(contact.eventName || "").trim();
+  if (direct) return direct;
+
+  const map = readEventLeadMap();
+  const zohoId = String(contact.zohoLeadId || "").trim();
+  if (zohoId && map.byZohoId[zohoId]?.eventName) {
+    return map.byZohoId[zohoId].eventName;
+  }
+  const key = eventContactKey(contact.email, contact.phone);
+  if (key && map.byContactKey[key]?.eventName) {
+    return map.byContactKey[key].eventName;
+  }
+  return "";
+}
