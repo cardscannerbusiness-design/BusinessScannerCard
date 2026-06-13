@@ -4,6 +4,7 @@ import { z } from "zod";
 
 const contactsSearchSchema = z.object({
   q: z.string().optional().catch(""),
+  event: z.string().optional().catch(""),
   /** Row key from contactRowKey — highlights matching table/card row */
   highlight: z.string().optional().catch(undefined),
 });

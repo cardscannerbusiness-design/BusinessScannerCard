@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = sidebarItems.filter((item) =>
-  ["/scan", "/contacts", "/queue", "/settings"].includes(item.url),
+  ["/scan", "/contacts", "/events", "/queue", "/settings"].includes(item.url),
 );
 
 export function AppSidebar() {

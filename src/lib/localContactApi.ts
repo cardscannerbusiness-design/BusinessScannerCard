@@ -53,6 +53,8 @@ function payloadToLocalBody(
     socialLinks: payload.socialLinks || "",
     gstNumber: payload.gstNumber || "",
     notes: payload.notes || "",
+    eventName: payload.eventName || "",
+    eventId: payload.eventId || "",
     cardImageBase64,
     syncStatus: "local_only" as const,
     connectionMode: options?.connectionMode ?? getConnectionMode(),
@@ -222,6 +224,8 @@ export function queueContactToPayload(contactData: Record<string, unknown>): Lea
     socialLinks: String(contactData.socialLinks || ""),
     gstNumber: String(contactData.gstNumber || ""),
     notes: String(contactData.notes || ""),
+    eventName: String(contactData.eventName || ""),
+    eventId: String(contactData.eventId || ""),
   };
 }
 
@@ -267,6 +271,8 @@ export function localContactToPayload(contact: LocalContact): LeadPayload {
     email: contact.email || String((contact as { emailAddress?: string }).emailAddress || ""),
     website: contact.website || "",
     address: contact.address || "",
+    eventName: String((contact as { eventName?: string }).eventName || ""),
+    eventId: String((contact as { eventId?: string }).eventId || ""),
   };
 }
 

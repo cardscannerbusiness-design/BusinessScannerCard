@@ -4,6 +4,13 @@ import { Search, Filter, RefreshCw, Mail, MessageCircle, Plus, Trash2, Send, Loa
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageShell } from "@/components/layout/PageShell";
 import { PAGE } from "@/constants/navigation";
 import { StatusPill } from "@/components/layout/StatusPill";
@@ -22,6 +29,7 @@ import { getConnectionMode } from "@/lib/connectionMode";
 import { deleteDirectoryContact } from "@/lib/deleteDirectoryContact";
 import { contactRowKey, type DirectoryContact } from "@/lib/contactsDirectory";
 import { getQueueItems, updateQueueItem, type QueueItem } from "@/lib/indexeddb";
+import { loadEvents } from "@/lib/eventStorage";
 import type { ContactStatus } from "@/lib/contactStatus";
 import { Route as ContactsRoute } from "@/routes/contacts";
 import { cn } from "@/lib/utils";
@@ -42,9 +50,15 @@ const tabs: { key: "all" | ContactStatus; label: string }[] = [
 export function ContactsPage() {
   const { confirm } = useConfirmModal();
   const navigate = useNavigate({ from: ContactsRoute.fullPath });
-  const { q = "", highlight } = ContactsRoute.useSearch();
+  const { q = "", highlight, event: eventFilter = "" } = ContactsRoute.useSearch();
   const setQ = (next: string) => {
-    void navigate({ search: { q: next.trim() || undefined }, replace: true });
+    void navigate({ search: (prev) => ({ ...prev, q: next.trim() || undefined }), replace: true });
+  };
+  const setEventFilter = (next: string) => {
+    void navigate({
+      search: (prev) => ({ ...prev, event: next === "all" ? undefined : next }),
+      replace: true,
+    });
   };
   const { contacts: contactsList, isLoading, isRefreshing, refresh, removeContact } =
     useContactsDirectory();
@@ -196,11 +210,24 @@ export function ContactsPage() {
   const filtered = useMemo(() => {
     return contactsList.filter((c) => {
       if (tab !== "all" && c.status !== tab) return false;
-      const searchStr = `${c.name || ''} ${c.company || ''} ${c.email || ''}`.toLowerCase();
+      if (eventFilter && (c.eventName || "").trim().toLowerCase() !== eventFilter.trim().toLowerCase()) return false;
+      const searchStr = `${c.name || ""} ${c.company || ""} ${c.email || ""} ${c.eventName || ""}`.toLowerCase();
       if (q && !searchStr.includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [contactsList, tab, q]);
+  }, [contactsList, tab, q, eventFilter]);
+
+  const eventFilterOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const contact of contactsList) {
+      const name = (contact.eventName || "").trim();
+      if (name) names.add(name);
+    }
+    for (const event of loadEvents()) {
+      names.add(event.name);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [contactsList]);
 
   const highlightInView = useMemo(() => {
     if (!highlight) return false;
@@ -322,9 +349,28 @@ export function ContactsPage() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search name, company or email"
+              placeholder="Search name, company, email, or event"
               className="h-10 w-full rounded-md border-border/60 bg-background pl-9"
             />
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Select
+              value={eventFilter || "all"}
+              onValueChange={setEventFilter}
+            >
+              <SelectTrigger className="h-10 w-full rounded-md border-border/60 bg-background sm:w-[240px]">
+                <SelectValue placeholder="Filter by event" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All events</SelectItem>
+                {eventFilterOptions.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Mobile: full-width tab grid (primary UX) */}
@@ -389,6 +435,7 @@ export function ContactsPage() {
                 <thead className="bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">Contact</th>
+                    <th className="px-4 py-3 font-medium">Event</th>
                     <th className="px-4 py-3 font-medium">Title</th>
                     <th className="px-4 py-3 font-medium">Channels</th>
                     <th className="px-4 py-3 font-medium">Status</th>
@@ -421,6 +468,9 @@ export function ContactsPage() {
                             <div className="text-[11px] text-muted-foreground">{c.company} · {sourceLabel(c.source, c.status)}</div>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {c.eventName || "—"}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{c.title}</td>
                       <td className="px-4 py-3">
@@ -522,6 +572,11 @@ export function ContactsPage() {
                       <div className="truncate text-xs text-muted-foreground">
                         {c.title || "—"} · {c.company || "No company"}
                       </div>
+                      {c.eventName ? (
+                        <div className="mt-0.5 truncate text-[11px] text-primary/90">
+                          Event: {c.eventName}
+                        </div>
+                      ) : null}
                       <div className="mt-0.5 text-[11px] text-muted-foreground">
                         {sourceLabel(c.source, c.status)} · {c.lastSync}
                       </div>

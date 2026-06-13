@@ -45,6 +45,8 @@ import { loadUserSettings } from "@/lib/settingsStorage";
 import { parseScanContact } from "@/lib/scanResult";
 import { scanFileAndStore } from "@/lib/scanPipeline";
 import { loadScanSession, readFileAsDataUrl, dataUrlToFile, isEmptyScanContact } from "@/lib/scanSession";
+import { EventNameCombobox } from "@/components/review/EventNameCombobox";
+import { getLastUsedEventName, loadEvents, resolveEventForSave } from "@/lib/eventStorage";
 
 const sectionMap = {
   basic: "Basic Information",
@@ -92,6 +94,8 @@ export const ReviewPage = () => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [ocrWarning, setOcrWarning] = useState<string | null>(null);
   const [showAdvancedFields, setShowAdvancedFields] = useState(false);
+  const [eventName, setEventName] = useState(() => getLastUsedEventName() || "");
+  const [eventError, setEventError] = useState<string | null>(null);
   const { success, error, info } = useToast();
   const upload = useUpload();
   const form = useForm(leadFields, initialValues);
@@ -265,25 +269,34 @@ export const ReviewPage = () => {
     })();
   }, [scanRevision, isExtracting]);
 
-  const buildPayload = (): LeadPayload => ({
-    fullName: resolvedFullName,
-    firstName: form.values.firstName,
-    lastName: form.values.lastName,
-    designation: form.values.designation,
-    company: form.values.companyName,
-    phone: form.values.phoneNumber,
-    secondaryPhone: form.values.secondaryPhoneNumber,
-    email:
-      form.values.emailAddress.trim() ||
-      form.values.secondaryEmailAddress.trim(),
-    secondaryEmail: form.values.secondaryEmailAddress,
-    website: form.values.website,
-    secondaryWebsite: form.values.secondaryWebsite,
-    address: form.values.address,
-    secondaryAddress: form.values.secondaryAddress,
-    socialLinks: form.values.socialLinks,
-    gstNumber: form.values.gstNumber,
-  });
+  const buildPayload = (): LeadPayload => {
+    const trimmedEvent = (eventName ?? "").trim();
+    const existingEvent = loadEvents().find(
+      (event) => event.name.toLowerCase() === trimmedEvent.toLowerCase(),
+    );
+
+    return {
+      fullName: resolvedFullName,
+      firstName: form.values.firstName,
+      lastName: form.values.lastName,
+      designation: form.values.designation,
+      company: form.values.companyName,
+      phone: form.values.phoneNumber,
+      secondaryPhone: form.values.secondaryPhoneNumber,
+      email:
+        form.values.emailAddress.trim() ||
+        form.values.secondaryEmailAddress.trim(),
+      secondaryEmail: form.values.secondaryEmailAddress,
+      website: form.values.website,
+      secondaryWebsite: form.values.secondaryWebsite,
+      address: form.values.address,
+      secondaryAddress: form.values.secondaryAddress,
+      socialLinks: form.values.socialLinks,
+      gstNumber: form.values.gstNumber,
+      eventName: trimmedEvent,
+      eventId: existingEvent?.id,
+    };
+  };
 
   const finishAfterSave = () => {
     sessionStorage.removeItem("latestScanResult");
@@ -439,6 +452,13 @@ export const ReviewPage = () => {
       return;
     }
 
+    if (!(eventName ?? "").trim()) {
+      setEventError("Select or enter an event name before saving.");
+      error("Please select or enter an event name before saving.");
+      return;
+    }
+    setEventError(null);
+
     if (!form.validate({ fullName })) {
       error("Please resolve validation errors before saving.");
       return;
@@ -448,7 +468,14 @@ export const ReviewPage = () => {
       form.setValue("fullName", fullName);
     }
 
-    const payload = buildPayload();
+    const savedEvent = resolveEventForSave((eventName ?? "").trim());
+    setEventName(savedEvent.name);
+
+    const payload = {
+      ...buildPayload(),
+      eventName: savedEvent.name,
+      eventId: savedEvent.id,
+    };
     const imageFile = await resolveCardImageFile(upload.file, upload.previewUrl, savedScanImage);
     pendingPayloadRef.current = payload;
     pendingImageRef.current = imageFile;
@@ -553,6 +580,16 @@ export const ReviewPage = () => {
                 {isExtracting ? <LoadingSpinner label="Extracting…" /> : null}
               </div>
               <OCRPreview values={form.values} />
+              <div className="mt-5 border-t border-border/60 pt-5">
+                <EventNameCombobox
+                  value={eventName ?? ""}
+                  onChange={(next) => {
+                    setEventName(next ?? "");
+                    if ((next ?? "").trim()) setEventError(null);
+                  }}
+                  error={eventError || undefined}
+                />
+              </div>
             </Card>
           </>
         }
@@ -674,7 +711,7 @@ export const ReviewPage = () => {
       <DuplicateResolutionModal
         open={showDuplicateModal}
         match={duplicateMatch}
-        incoming={pendingPayloadRef.current || buildPayload()}
+        incoming={pendingPayloadRef.current ?? buildPayload()}
         onResolve={executeSave}
       />
 

@@ -11,6 +11,8 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { loadUserSettings } from "@/lib/settingsStorage";
 import { getQueueItems, getCachedContacts, cacheContacts } from "@/lib/indexeddb";
 import { isValidCardImage, readFileAsDataUrl } from "@/lib/scanSession";
+import { getLastUsedEventName } from "@/lib/eventStorage";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 const CameraCapture = lazy(() =>
@@ -34,6 +36,17 @@ export function ScanPage() {
     typeof window !== "undefined" ? getConnectionMode() : "online",
   );
   const { firstName, settings } = useUserSettings();
+  const [activeEventName, setActiveEventName] = useState(() => getLastUsedEventName());
+
+  useEffect(() => {
+    const refreshActiveEvent = () => setActiveEventName(getLastUsedEventName());
+    window.addEventListener("storage", refreshActiveEvent);
+    window.addEventListener("focus", refreshActiveEvent);
+    return () => {
+      window.removeEventListener("storage", refreshActiveEvent);
+      window.removeEventListener("focus", refreshActiveEvent);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -289,6 +302,13 @@ export function ScanPage() {
               </h2>
             </div>
             <p className="text-xs text-muted-foreground">{dateStr}</p>
+            {activeEventName ? (
+              <div className="pt-1">
+                <Badge variant="secondary" className="rounded-lg px-2.5 py-1 text-[11px] font-medium">
+                  Active event: {activeEventName}
+                </Badge>
+              </div>
+            ) : null}
           </div>
           
           {settings.showCaptureTips ? (

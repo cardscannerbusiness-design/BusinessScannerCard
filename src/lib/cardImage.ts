@@ -15,6 +15,10 @@ export type LeadPayload = {
   socialLinks?: string;
   gstNumber?: string;
   notes?: string;
+  /** Event where this card was collected (required on save). */
+  eventName?: string;
+  /** Client-side event id from local event list. */
+  eventId?: string;
 };
 
 export async function resolveCardImageFile(
@@ -52,6 +56,8 @@ export function buildContactBody(payload: LeadPayload) {
     socialLinks: payload.socialLinks || "",
     gstNumber: payload.gstNumber || "",
     notes: payload.notes || "",
+    eventName: payload.eventName || "",
+    eventId: payload.eventId || "",
     source: "scan",
   };
 }

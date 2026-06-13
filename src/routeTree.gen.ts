@@ -14,6 +14,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ScanRouteImport } from './routes/scan'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as QueueRouteImport } from './routes/queue'
+import { Route as EventsRouteImport } from './routes/events'
 import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
@@ -43,6 +44,11 @@ const QueueRoute = QueueRouteImport.update({
   path: '/queue',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventsRoute = EventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContactsRoute = ContactsRouteImport.update({
   id: '/contacts',
   path: '/contacts',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/contacts': typeof ContactsRoute
+  '/events': typeof EventsRoute
   '/queue': typeof QueueRoute
   '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/contacts': typeof ContactsRoute
+  '/events': typeof EventsRoute
   '/queue': typeof QueueRoute
   '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/contacts': typeof ContactsRoute
+  '/events': typeof EventsRoute
   '/queue': typeof QueueRoute
   '/review': typeof ReviewRoute
   '/scan': typeof ScanRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/contacts'
+    | '/events'
     | '/queue'
     | '/review'
     | '/scan'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/contacts'
+    | '/events'
     | '/queue'
     | '/review'
     | '/scan'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/contacts'
+    | '/events'
     | '/queue'
     | '/review'
     | '/scan'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
   ContactsRoute: typeof ContactsRoute
+  EventsRoute: typeof EventsRoute
   QueueRoute: typeof QueueRoute
   ReviewRoute: typeof ReviewRoute
   ScanRoute: typeof ScanRoute
@@ -171,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QueueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/events': {
+      id: '/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof EventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contacts': {
       id: '/contacts'
       path: '/contacts'
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
   ContactsRoute: ContactsRoute,
+  EventsRoute: EventsRoute,
   QueueRoute: QueueRoute,
   ReviewRoute: ReviewRoute,
   ScanRoute: ScanRoute,

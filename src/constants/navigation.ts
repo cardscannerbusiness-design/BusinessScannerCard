@@ -6,6 +6,7 @@ export const NAV_SECTION_LABEL = "Menu";
 export const NAV = {
   capture: { label: "Capture a card", path: "/scan" as const },
   contacts: { label: "Contacts List", path: "/contacts" as const },
+  events: { label: "Events", path: "/events" as const },
   syncQueue: { label: "Offline Queue System", path: "/queue" as const },
   preferences: { label: "Settings & Preferences", path: "/settings" as const },
 } as const;
@@ -19,6 +20,10 @@ export const PAGE = {
   contacts: {
     title: "Contact Lists",
     description: "Search, filter, and manage every lead saved on this device.",
+  },
+  events: {
+    title: "Events",
+    description: "Open an event folder to see leads and sync stats for that event.",
   },
   syncQueue: {
     title: "Sync queue",

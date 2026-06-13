@@ -145,6 +145,8 @@ function contactRecordFromPayload(
     socialLinks: String(payload.socialLinks || ""),
     gstNumber: String(payload.gstNumber || ""),
     notes: String(payload.notes || ""),
+    eventName: String(payload.eventName || ""),
+    eventId: String(payload.eventId || ""),
     cardImageBase64: cardImageBase64 ?? payload.cardImageBase64,
     syncStatus,
     zohoLeadId: zohoLeadId ?? null,
