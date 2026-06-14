@@ -31,12 +31,12 @@ export const FieldRenderer = ({
   return (
     <div
       className={cn(
-        "space-y-1.5 rounded-xl p-2 transition-colors",
-        isLow && "border border-amber-500/40 bg-amber-500/5",
+        "space-y-1.5",
+        isLow && "rounded-xl border border-amber-500/40 bg-amber-500/5 p-2",
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <Label className="text-xs text-muted-foreground">{field.label}</Label>
+        <Label className="text-sm font-medium text-foreground">{field.label}</Label>
         {showConfidence && (
           <span
             className={cn(

@@ -11,7 +11,7 @@ export const FormSection = ({
   className?: string;
 }) => (
   <section className={cn("space-y-4", className)}>
-    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</h3>
     {children}
   </section>
 );

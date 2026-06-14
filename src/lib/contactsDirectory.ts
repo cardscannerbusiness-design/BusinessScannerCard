@@ -15,6 +15,7 @@ export type DirectoryContact = {
   email: string;
   phone: string;
   eventName?: string;
+  notes?: string;
   status: ContactStatus;
   source: "zoho" | "queue" | "localdb" | "indexeddb";
   zohoLeadId?: string | null;
@@ -45,7 +46,7 @@ export function contactRowKey(contact: Pick<DirectoryContact, "source" | "id">):
 }
 
 export function contactSearchText(contact: DirectoryContact): string {
-  return `${contact.name} ${contact.company} ${contact.email} ${contact.phone} ${contact.title} ${contact.eventName || ""}`
+  return `${contact.name} ${contact.company} ${contact.email} ${contact.phone} ${contact.title} ${contact.eventName || ""} ${contact.notes || ""}`
     .toLowerCase()
     .trim();
 }
@@ -161,6 +162,7 @@ async function fetchContactsDirectoryFromSources(): Promise<ContactsDirectorySna
         email: String(c.email || ""),
         phone: String(c.phone || ""),
       }),
+      notes: String(c.notes || ""),
       source: "zoho" as const,
       initials,
       accent: String(c.accent || ACCENTS[i % ACCENTS.length]),
@@ -203,6 +205,7 @@ async function fetchContactsDirectoryFromSources(): Promise<ContactsDirectorySna
             email: String(c.email || ""),
             phone: String(c.phone || ""),
           }),
+          notes: String(c.notes || ""),
           status: (item.status === "retrying" ? "pending" : item.status) as ContactStatus,
           channels: c.channels || {
             whatsapp: !!c.phone,
@@ -262,6 +265,7 @@ async function fetchContactsDirectoryFromSources(): Promise<ContactsDirectorySna
           email: String(c.email || ""),
           phone: String(c.phone || ""),
         }),
+        notes: String(c.notes || ""),
         source: storageSource,
         zohoLeadId: (c.zohoLeadId as string | null) || null,
         initials,

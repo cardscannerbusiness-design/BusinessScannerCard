@@ -271,6 +271,7 @@ export function localContactToPayload(contact: LocalContact): LeadPayload {
     email: contact.email || String((contact as { emailAddress?: string }).emailAddress || ""),
     website: contact.website || "",
     address: contact.address || "",
+    notes: String((contact as { notes?: string }).notes || ""),
     eventName: String((contact as { eventName?: string }).eventName || ""),
     eventId: String((contact as { eventId?: string }).eventId || ""),
   };

@@ -19,6 +19,8 @@ import { FormActions } from "@/components/form/FormActions";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Button } from "@/components/common/Button";
 import { CameraCapture } from "@/components/camera/CameraCapture";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   ExtractedValuePicker,
   createPickerItems,
@@ -30,7 +32,7 @@ import {
   type DuplicateAction,
 } from "@/components/review/DuplicateResolutionModal";
 import { buildContactBody, resolveCardImageFile, type LeadPayload } from "@/lib/cardImage";
-import { isOfflineMode, getConnectionMode, syncConnectionModeWithNetwork, CONNECTION_MODE_CHANGED } from "@/lib/connectionMode";
+import { isOfflineMode, getConnectionMode } from "@/lib/connectionMode";
 import { pickPrimaryEmail } from "@/lib/contactEmail";
 import {
   checkStorageHealth,
@@ -98,9 +100,7 @@ export const ReviewPage = () => {
   const [showAdvancedFields, setShowAdvancedFields] = useState(false);
   const [eventName, setEventName] = useState(() => getLastUsedEventName() || "");
   const [eventError, setEventError] = useState<string | null>(null);
-  const [connectionMode, setConnectionMode] = useState<"online" | "offline">(() =>
-    typeof window !== "undefined" ? getConnectionMode() : "online",
-  );
+  const [notes, setNotes] = useState("");
   const { success, error, info } = useToast();
   const upload = useUpload();
   const form = useForm(leadFields, initialValues);
@@ -153,6 +153,7 @@ export const ReviewPage = () => {
       socialLinks: raw.socialLinks,
       gstNumber: raw.gstNumber,
     });
+    setNotes(raw.notes || "");
   }, [form.setMany]);
 
   const loadFromSession = useCallback(() => {
@@ -229,23 +230,6 @@ export const ReviewPage = () => {
     window.addEventListener("cs-scan-updated", onScanUpdated);
     return () => window.removeEventListener("cs-scan-updated", onScanUpdated);
   }, [loadFromSession]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const refreshMode = () => setConnectionMode(getConnectionMode());
-    syncConnectionModeWithNetwork();
-    refreshMode();
-
-    window.addEventListener("online", refreshMode);
-    window.addEventListener("offline", refreshMode);
-    window.addEventListener(CONNECTION_MODE_CHANGED, refreshMode);
-    return () => {
-      window.removeEventListener("online", refreshMode);
-      window.removeEventListener("offline", refreshMode);
-      window.removeEventListener(CONNECTION_MODE_CHANGED, refreshMode);
-    };
-  }, []);
 
   const readEventName = () => {
     const fromInput = eventInputRef.current?.value?.trim();
@@ -328,6 +312,7 @@ export const ReviewPage = () => {
       secondaryAddress: form.values.secondaryAddress,
       socialLinks: form.values.socialLinks,
       gstNumber: form.values.gstNumber,
+      notes: notes.trim(),
       eventName: trimmedEvent,
       eventId: existingEvent?.id,
     };
@@ -610,33 +595,54 @@ export const ReviewPage = () => {
                   onPick={() => inputRef.current?.click()}
                 />
               )}
-              <div className="mt-3 flex gap-2">
-                <Button variantType="secondary" className="flex-1" onClick={() => setCameraOpen(true)}>
+              <div className="mt-4 flex gap-2">
+                <Button variantType="secondary" className="h-11 flex-1 rounded-xl" onClick={() => setCameraOpen(true)}>
                   Use camera
                 </Button>
-                <Button variantType="secondary" className="flex-1" onClick={() => navigate({ to: "/scan" })}>
+                <Button variantType="secondary" className="h-11 flex-1 rounded-xl" onClick={() => navigate({ to: "/scan" })}>
                   Retake scan
                 </Button>
               </div>
             </Card>
             <Card>
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Extracted preview</h3>
-                {isExtracting ? <LoadingSpinner label="Extracting…" /> : null}
-              </div>
-              <OCRPreview values={form.values} />
+              <EventNameCombobox
+                ref={eventInputRef}
+                value={eventName ?? ""}
+                onChange={(next) => {
+                  const value = next ?? "";
+                  eventNameRef.current = value;
+                  setEventName(value);
+                  if (value.trim()) setEventError(null);
+                }}
+                error={eventError || undefined}
+              />
+
               <div className="mt-5 border-t border-border/60 pt-5">
-                <EventNameCombobox
-                  ref={eventInputRef}
-                  value={eventName ?? ""}
-                  onChange={(next) => {
-                    const value = next ?? "";
-                    eventNameRef.current = value;
-                    setEventName(value);
-                    if (value.trim()) setEventError(null);
-                  }}
-                  error={eventError || undefined}
-                />
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-foreground">Extracted preview</h3>
+                  {isExtracting ? <LoadingSpinner label="Extracting…" /> : null}
+                </div>
+                <OCRPreview values={form.values} />
+              </div>
+
+              <div className="mt-5 border-t border-border/60 pt-5">
+                <div className="space-y-2">
+                  <Label htmlFor="contact-notes" className="text-sm font-medium text-foreground">
+                    Notes
+                  </Label>
+                  <Textarea
+                    id="contact-notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add notes about this contact..."
+                    maxLength={2000}
+                    className="min-h-28 resize-none rounded-xl border-border/60 bg-background"
+                  />
+      <p className="text-xs text-muted-foreground">
+        Saved to Zoho Features column as Notes (stored below the event name on the lead).
+      </p>
+                  <p className="text-right text-xs text-muted-foreground">{notes.length}/2000 characters</p>
+                </div>
               </div>
             </Card>
           </>
@@ -669,14 +675,14 @@ export const ReviewPage = () => {
             )}
 
             <FormSection title="Review fields" className="mb-5">
-              <div className="group flex flex-col gap-3 rounded-3xl border border-border/60 bg-gradient-to-r from-sky-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:from-slate-900 dark:to-slate-950 text-sm text-slate-900 dark:text-slate-100">
+              <div className="flex flex-col gap-3 rounded-2xl border border-sky-200/70 bg-sky-50/80 p-4 text-sm dark:border-slate-700 dark:bg-slate-900/50">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="font-semibold text-slate-700 dark:text-slate-200">Show optional fields</p>
                   <Button
                     type="button"
                     variantType={showAdvancedFields ? "secondary" : "primary"}
                     onClick={() => setShowAdvancedFields((prev) => !prev)}
-                    className="h-10 transition-transform duration-200 group-hover:scale-[1.01] hover:-translate-y-0.5"
+                    className="h-10 rounded-xl px-5"
                   >
                     {showAdvancedFields ? "Collapse optional fields" : "Show optional fields"}
                   </Button>
@@ -731,20 +737,8 @@ export const ReviewPage = () => {
               </FormSection>
             ))}
 
-            <div className="mb-5 rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-              Mode:{" "}
-              <span className="font-medium text-foreground">
-                {connectionMode === "online" ? "Online — syncs to Zoho on save" : "Offline — saves to device queue"}
-              </span>
-              {connectionMode === "offline" && typeof navigator !== "undefined" && navigator.onLine ? (
-                <span className="mt-1 block text-amber-700 dark:text-amber-300">
-                  Browser is online but app is in offline mode. Turn off &quot;Prefer offline capture&quot; in Settings to sync events to Zoho immediately.
-                </span>
-              ) : null}
-            </div>
-
-            <p className="mb-3 mt-4 text-xs text-muted-foreground">
-              Save syncs to Zoho CRM when online. Event name is required and stored in Zoho Features.
+            <p className="mb-1 mt-2 text-xs text-muted-foreground">
+              Save syncs to Zoho CRM when online. Event name and notes are stored in Zoho Features.
             </p>
             <FormActions
               onReset={() => {

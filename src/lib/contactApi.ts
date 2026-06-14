@@ -128,6 +128,7 @@ export async function syncPayloadToZoho(
         secondaryAddress: payload.secondaryAddress,
         eventName: payload.eventName,
         eventId: payload.eventId,
+        notes: payload.notes || "",
         zohoLeadId: payload.zohoLeadId,
         connectionMode: options?.connectionMode ?? "online",
         skipWhatsApp: Boolean(options?.skipWhatsApp),

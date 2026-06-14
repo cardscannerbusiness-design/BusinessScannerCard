@@ -98,6 +98,7 @@ function EventContactsTable({ contacts }: { contacts: DirectoryContact[] }) {
               <th className="px-4 py-3 font-medium">Company</th>
               <th className="px-4 py-3 font-medium">Email</th>
               <th className="px-4 py-3 font-medium">Phone</th>
+              <th className="px-4 py-3 font-medium">Notes</th>
               <th className="px-4 py-3 font-medium">Status</th>
             </tr>
           </thead>
@@ -111,6 +112,11 @@ function EventContactsTable({ contacts }: { contacts: DirectoryContact[] }) {
                 <td className="px-4 py-3 text-muted-foreground">{contact.company || "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{contact.email || "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{contact.phone || "—"}</td>
+                <td className="max-w-xs px-4 py-3 text-muted-foreground">
+                  <span className="line-clamp-2" title={contact.notes || undefined}>
+                    {contact.notes || "—"}
+                  </span>
+                </td>
                 <td className="px-4 py-3">
                   <StatusPill status={contact.status} />
                 </td>
@@ -127,6 +133,9 @@ function EventContactsTable({ contacts }: { contacts: DirectoryContact[] }) {
             <div className="mt-1 text-xs text-muted-foreground">
               {contact.company || "No company"} · {contact.email || "No email"}
             </div>
+            {contact.notes ? (
+              <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{contact.notes}</p>
+            ) : null}
             <div className="mt-3 flex items-center justify-between gap-2">
               <StatusPill status={contact.status} />
               <span className="text-xs text-muted-foreground">{contact.phone || "—"}</span>

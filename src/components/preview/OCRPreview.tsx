@@ -17,18 +17,16 @@ export const OCRPreview = ({ values }: { values: Record<string, string> }) => {
     );
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {entries.map(([key, value]) => (
-        <div
-          key={key}
-          className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-3 py-2"
-        >
-          <span className="text-xs font-medium text-muted-foreground">{key}</span>
-          <span className="max-w-[70%] truncate text-xs">{value}</span>
-        </div>
+        <p key={key} className="text-sm leading-relaxed">
+          <span className="font-medium text-foreground">{key}</span>
+          <span className="text-muted-foreground">: </span>
+          <span className="text-foreground">{value}</span>
+        </p>
       ))}
-      <div className="mt-3 inline-flex items-center gap-2 text-xs text-success">
-        <CheckCircle2 className="h-3.5 w-3.5" /> OCR extraction ready
+      <div className="mt-4 inline-flex items-center gap-2 text-sm text-success">
+        <CheckCircle2 className="h-4 w-4" /> OCR extraction ready
       </div>
     </div>
   );
