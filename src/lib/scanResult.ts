@@ -93,7 +93,7 @@ export function parseScanContact(raw: ScanContact): ParsedScanResult {
     secondaryAddress: addresses[1] || "",
     socialLinks: socialLinksList.join(", "),
     gstNumber: gstNumbers[0] || "",
-    notes: raw.notes || "",
+    notes: "",
     phones,
     emails,
     websites,

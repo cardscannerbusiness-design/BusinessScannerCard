@@ -174,7 +174,6 @@ export function parseOcrText(rawText: string): ScanContact {
 
   const fullName = name || (emails[0] ? emails[0].split("@")[0].replace(/[._\-]/g, " ") : "");
   const { firstName, lastName } = inferNames(fullName);
-  const notes = linesAfterName.filter((line) => line !== companyName && line !== designation).join(" | ");
 
   return {
     fullName: fullName.trim(),
@@ -197,7 +196,7 @@ export function parseOcrText(rawText: string): ScanContact {
     addresses: addressResult.addresses,
     socialLinks: socialLinks.join(", "),
     socialLinksList: socialLinks,
-    notes,
+    notes: "",
     confidence: {},
   };
 }

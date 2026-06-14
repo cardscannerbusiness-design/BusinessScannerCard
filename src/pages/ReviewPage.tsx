@@ -153,7 +153,7 @@ export const ReviewPage = () => {
       socialLinks: raw.socialLinks,
       gstNumber: raw.gstNumber,
     });
-    setNotes(raw.notes || "");
+    setNotes("");
   }, [form.setMany]);
 
   const loadFromSession = useCallback(() => {
